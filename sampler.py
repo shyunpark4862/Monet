@@ -2,28 +2,25 @@ from collections.abc import Callable
 
 import numpy as np
 
-from sample import SampleND, Sample2D, Sample3D
-
 
 class UniformSampler:
     def __init__(
             self,
             func: Callable[[np.ndarray, ...], np.ndarray],
             bounds: np.ndarray,
-            n_samples: tuple
+            n_samples: tuple[int, ...]
     ):
         self.func = func
         self.bounds = bounds
         self.n_samples = n_samples
 
-    def run(self) -> SampleND:
+    def run(self) -> tuple[np.ndarray, ...]:
         eval_points = []
         for bound, n in zip(self.bounds, self.n_samples):
             eval_points.append(np.linspace(*bound, n))
         X = np.meshgrid(*eval_points)
         Y = self.func(*X)
-        data = np.column_stack((*[x.ravel() for x in X], Y.ravel()))
-        return SampleND(data)
+        return (*X, Y)
 
 
 class UnivariateUniformSampler(UniformSampler):
@@ -35,11 +32,10 @@ class UnivariateUniformSampler(UniformSampler):
     ):
         super().__init__(func, np.atleast_2d(xbound), (n_samples,))
 
-    def run(self) -> Sample2D:
-        xs = np.linspace(*self.bounds[0], self.n_samples[0])
-        ys = self.func(xs)
-        data = np.column_stack((xs, ys))
-        return Sample2D(data)
+    def run(self) -> tuple[np.ndarray, np.ndarray]:
+        x = np.linspace(*self.bounds[0], self.n_samples[0])
+        y = self.func(x)
+        return x, y
 
 
 class BivariateUniformSampler(UniformSampler):
@@ -52,15 +48,12 @@ class BivariateUniformSampler(UniformSampler):
     ):
         super().__init__(func, np.vstack((xbound, ybound)), n_samples)
 
-    def run(self) -> Sample3D:
-        xs = np.linspace(*self.bounds[0], self.n_samples[0])
-        ys = np.linspace(*self.bounds[1], self.n_samples[1])
-        X, Y = np.meshgrid(xs, ys)
+    def run(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        x = np.linspace(*self.bounds[0], self.n_samples[0])
+        y = np.linspace(*self.bounds[1], self.n_samples[1])
+        X, Y = np.meshgrid(x, y)
         Z = self.func(X, Y)
-        data = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-        sample = Sample3D(data)
-        sample.build_mesh(self.n_samples, "rectangle")
-        return sample
+        return X, Y, Z
 
 
 if __name__ == '__main__':
@@ -72,10 +65,15 @@ if __name__ == '__main__':
         return x ** 2 + y ** 2
 
 
+    def h(x, y, z):
+        return x ** 2 + y ** 2 + z ** 2
+
+
     # sampler = UnivariateUniformSampler(f, (-10, 10))
     # sample = sampler.run()
     # print(sample)
 
-    sampler = BivariateUniformSampler(g, (-10, 10), (-10, 10))
+    sampler = UniformSampler(h, np.array([[-10, 10], [-10, 10], [-10, 10]]),
+                             (2, 2, 2))
     sample = sampler.run()
-    print(sample.get_plot_points())
+    print(sample)
