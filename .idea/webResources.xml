@@ -8,6 +8,8 @@
             <path value="file://$PROJECT_DIR$/src/plotter/styles" />
             <path value="file://$PROJECT_DIR$/tests/plotter/figures" />
             <path value="file://$PROJECT_DIR$/tests/plotter/hashes" />
+            <path value="file://$PROJECT_DIR$/tests/fplotter/figures" />
+            <path value="file://$PROJECT_DIR$/tests/fplotter/hashes" />
           </resourceRoots>
         </entryData>
       </entry>

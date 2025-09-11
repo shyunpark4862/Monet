@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "monet"
+version = "0.1.0"
+authors = [
+  { name="SangHyun Park", email="shyunpark4862@gmail.com" },
+]
+description = "A Python package for plotting functions with adaptive refinement."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["plotter", "fplotter"]
+
+[project.urls]
+"Homepage" = "https://github.com/shyunpark4862/monet"
