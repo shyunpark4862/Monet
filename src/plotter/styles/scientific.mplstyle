@@ -1,8 +1,9 @@
-axes.prop_cycle : cycler(linestyle=['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (5, 10))])
+# Set default colors
+axes.prop_cycle : cycler("color", ["#00AFBB", "#E7B800", "#FC4E07", "#BB3099", "#EE0099", "#0000AC"])
 
 # Set default figure size
 figure.figsize : 4.6, 3.45
-figure.dpi : 300
+figure.dpi : 500
 
 # Set x axis
 xtick.direction : in
@@ -25,7 +26,6 @@ ytick.right : True
 # Set line widths
 axes.linewidth : 0.5
 grid.linewidth : 0.5
-lines.linewidth : 1
 
 # Remove legend frame
 legend.frameon : False
