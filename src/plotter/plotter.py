@@ -381,7 +381,7 @@ class Plotter:
     @_apply_style
     def save(
             self,
-            file_name: str | Path,
+            filename: str | Path,
             transparent: bool = True,
             dpi: int | Literal["figure"] = "figure",
             format_: str | None = None,
@@ -391,7 +391,7 @@ class Plotter:
 
         Parameters
         ----------
-        file_name : str or Path
+        filename : str or Path
             The name of the file to save.
         transparent : bool, optional (default: True)
             Whether to save the figure with a transparent background.
@@ -413,7 +413,7 @@ class Plotter:
         a specific reason not to, always call ``clear()`` after ``save()``.
         """
         self.figure.savefig(
-            Path(file_name), transparent=transparent, dpi=dpi, format=format_
+            Path(filename), transparent=transparent, dpi=dpi, format=format_
         )
 
     @_apply_style

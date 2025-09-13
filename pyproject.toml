@@ -32,5 +32,8 @@ dev = [
 package-dir = {"" = "src"}
 packages = ["plotter", "fplotter"]
 
+[tool.setuptools.package-data]
+plotter = ["styles/**/*"]
+
 [project.urls]
 "Homepage" = "https://github.com/shyunpark4862/monet"
