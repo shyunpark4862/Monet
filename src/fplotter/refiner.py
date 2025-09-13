@@ -1,31 +1,71 @@
+"""
+The MIT License
+
+Copyright (c) 2025 SangHyun Park
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Final
 
 import numpy as np
 from scipy.spatial import Delaunay
 
-from sampler import Sample, Sample2d, Sample3d
+from .sampler import Sample2d, Sample3d
 
-FLT_EPS: float = np.finfo(float).eps
+FLT_EPS: Final[float] = np.finfo(float).eps  # Floating point epsilon
 
-
-def normalize_vector(v: np.ndarray) -> np.ndarray:
-    norm = np.linalg.norm(v)
-    if not np.isfinite(norm):
-        return np.repeat(np.nan, len(v))
-    else:
-        return v / max(norm, FLT_EPS)
+""" CLASSES FOR MESH """
 
 
-@dataclass
-class Geometry(ABC):
+@dataclass(slots=True)
+class _MeshElement(ABC):
+    """
+    An abstract base class for a geometric element in a mesh.
+
+    This class serves as a container for the properties of a mesh element,
+    such as its vertices, neighbors, normal vector, and a "badness" metric
+    used for refinement.
+
+    Parameters
+    ----------
+    points : tuple[int, ...]
+        Indices of the vertices that form this mesh element, referencing the
+        main data array.
+    data : np.ndarray
+        A reference to the full dataset array containing all sample points.
+    badness : list[float]
+        A list storing the badness metric.
+    neighbors : list[_MeshElement]
+        A list of neighboring mesh elements.
+    normal : np.ndarray, optional (default: None)
+        The normal vector of the element.
+    """
     points: tuple[int, ...]
     data: np.ndarray
     badness: list[float]
-    neighbors: list[Geometry]
+    neighbors: list[_MeshElement]
     normal: np.ndarray = None
 
     @abstractmethod
@@ -37,241 +77,539 @@ class Geometry(ABC):
         pass
 
     def vertices(self) -> np.ndarray:
+        """
+        Returns the vertices of a mesh element as an array.
+
+        Returns
+        -------
+        numpy.ndarray
+            An array containing the vertices of the shape.
+        """
         return self.data[self.points, :]
 
     def neighbor_idx(
             self,
-            geometry: Geometry
+            mesh: _MeshElement
     ) -> int | None:
+        """
+        Finds the index of a given neighbor in the neighbors list.
+
+        Parameters
+        ----------
+        mesh : _MeshElement
+            The neighboring mesh element to find.
+
+        Returns
+        -------
+        int or None
+            The index of the neighbor, or None if it is not found.
+        """
         for i, neighbor in enumerate(self.neighbors):
-            if neighbor == geometry:
+            if neighbor == mesh:
                 return i
         return None
 
     def max_badness(self) -> float:
+        """
+        Calculates the maximum badness value for this element.
+
+        Returns
+        -------
+        float
+            The maximum badness value, ignoring NaNs. Returns NaN if all
+            badness values are NaN.
+        """
         if np.isnan(self.badness).all():
             return np.nan
         return np.nanmax(self.badness)
 
 
-class Interval(Geometry):
+class _Interval(_MeshElement):
+    """
+    Represents a 1D interval (a line segment) in the mesh.
+    """
+
     def __init__(
             self,
-            points: list[int],
+            points: tuple[int, int],
             data: np.ndarray
     ):
         super().__init__(points, data, np.repeat(np.nan, 3), [None] * 2)
 
     def midpoints(self) -> float:
+        """
+        Computes the midpoint of the interval.
+
+        Returns
+        -------
+        float
+            Midpoint of the interval.
+        """
         x0, x1 = self.vertices()[:, 0]
         return (x0 + x1) / 2
 
     def compute_normal(self) -> None:
+        """
+        Computes and assigns the normal vector for a 2D interval (line segment).
+
+        For a line segment from point ``x0 = (x0, y0)`` to ``x1 = (x1, y1)``, 
+        the normal vector ``n`` is computed as ``n = (y1 - y0, -(x1 - x0))``.
+        The resulting normal vector is then normalized to unit length and its 
+        direction is adjusted to ensure the y-component is positive.
+        """
         x0, x1 = self.vertices()
         n = np.array([x1[1] - x0[1], x0[0] - x1[0]])
-        n = normalize_vector(n)
+        n = _normalize(n)
         self.normal = n if n[-1] > 0 else -n
 
 
-class Triangle(Geometry):
+class _Triangle(_MeshElement):
+    """
+    Represents a 2D triangle in the mesh.
+    """
+
     def __init__(
             self,
-            points: list[int],
+            points: tuple[int, int, int],
             data: np.ndarray
     ):
         super().__init__(points, data, np.repeat(np.nan, 4), [None] * 3)
 
     def midpoints(self) -> np.ndarray:
+        """
+        Computes midpoints of the edges of a triangle.
+
+        Returns
+        -------
+        np.ndarray of shape (3, 2)
+            A np.ndarray containing the midpoints of the edges. Each row 
+            corresponds to a midpoint in the format (x, y).
+        """
         (x0, y0), (x1, y1), (x2, y2) = self.vertices()[:, :-1]
         xmid0, xmid1, xmid2 = (x0 + x1) / 2, (x1 + x2) / 2, (x2 + x0) / 2
         ymid0, ymid1, ymid2 = (y0 + y1) / 2, (y1 + y2) / 2, (y2 + y0) / 2
         return np.array(((xmid0, ymid0), (xmid1, ymid1), (xmid2, ymid2)))
 
     def compute_normal(self) -> None:
+        """
+        Computes and assigns the normal vector for a 3D triangle.
+
+        This method calculates the normal vector of a triangle defined by its 
+        vertices. The normal is derived using the cross product of two edges of 
+        the triangle. The normal vector ``n`` is calculated using the formula 
+        ``n = (x2 - x0) × (x2 - x0)`` where ``x0``, ``x1``, ``x2`` are the 
+        vertices of the triangle. The resulting normal vector is then normalized 
+        to unit length and its direction is adjusted to ensure the z-component 
+        is positive.
+        """
         x0, x1, x2 = self.vertices()
         n = np.cross(x1 - x0, x2 - x0)
-        n = normalize_vector(n)
+        n = _normalize(n)
         self.normal = n if n[-1] > 0 else -n
 
 
-class Refiner(ABC):
-    def __init__(
-            self,
-            func: Callable[[np.ndarray, ...], np.ndarray],
-            sample: Sample,
-            contour_levels: np.ndarray,
-            contour_only: bool,
-            threshold: float,
-            n_iters: int
-    ):
-        self.func = func
-        self.data: np.ndarray = sample.data.copy()
-        self.contour_levels = contour_levels
-        self.contour_only = contour_only
-        self.threshold = threshold
-        self.n_iters = n_iters
-        self.geometry: list[Interval] | None = None
-        self._early_exit: bool = False
-        self._n_new_data: int = 0
+def _normalize(v: np.ndarray) -> np.ndarray:
+    """
+    Normalizes a vector to a unit vector.
 
-    def run(self) -> Sample:
-        self._early_exit = False
-        for _ in range(self.n_iters):
-            if self._early_exit:
-                break
-            self._build_geometry()
-            self._compute_badness()
-            self._refine()
+    Parameters
+    ----------
+    v : np.ndarray
+        The input vector to normalize.
 
-        return Sample(self.data, None)
-
-    @abstractmethod
-    def _build_geometry(self) -> None:
-        pass
-
-    def _compute_badness(self) -> None:
-        for geometry in self.geometry:
-            if not self.contour_only:
-                for i, neighbor in enumerate(geometry.neighbors):
-                    if not np.isnan(geometry.badness[i]) or neighbor is None:
-                        continue
-                    curvature = self._compute_curvature(geometry, neighbor)
-                    j = neighbor.neighbor_idx(geometry)
-                    geometry.badness[i] = neighbor.badness[j] = curvature
-
-            values = geometry.vertices()[:, -1]
-            vmin, vmax = np.nanmin(values), np.nanmax(values)
-            if ((self.contour_levels > (vmin - FLT_EPS))
-                & (self.contour_levels < (vmax + FLT_EPS))).any():
-                geometry.badness[-1] = np.inf
-            else:
-                geometry.badness[-1] = -np.inf
-
-    @staticmethod
-    def _compute_curvature(
-            geometry: Geometry,
-            neighbor: Geometry
-    ) -> float:
-        v, w = geometry.normal, neighbor.normal
-        angle = np.arccos(min(np.dot(v, w), 1))
-        return angle if not np.isnan(angle) else -np.inf
-
-    def _refine(self) -> None:
-        coords = []
-        for geometry in self.geometry:
-            if geometry.max_badness() > self.threshold:
-                coords.append(geometry.midpoints())
-        if not coords:
-            self._early_exit = True
-            return
-        coords = np.vstack(coords)
-        values = np.atleast_2d(self.func(*coords.T)).T
-        data = np.hstack((coords, values))
-        self.data = np.vstack((self.data, data))
-        self._n_new_data = data.shape[0]
+    Returns
+    -------
+    np.ndarray
+        The normalized unit vector. Returns a vector of NaNs if the norm is
+        not finite.
+    """
+    norm = np.linalg.norm(v)
+    if not np.isfinite(norm):
+        return np.repeat(np.nan, len(v))
+    else:
+        return v / max(norm, FLT_EPS)
 
 
-class UnivariateRefiner(Refiner):
-    def __init__(
-            self,
-            func: Callable[[np.ndarray], np.ndarray],
-            sample: Sample2d,
-            contour_levels: np.ndarray,
-            contour_only: bool,
-            threshold: float,
-            n_iters: int
-    ):
-        super().__init__(
-            func, sample, contour_levels, contour_only, threshold, n_iters
-        )
-
-    def _build_geometry(self) -> None:
-        self.data = self.data[np.argsort(self.data[:, 0])]
-        intervals = []
-        for i in range(self.data.shape[0] - 1):
-            interval = Interval([i, i + 1], self.data)
-            if i > 0:
-                interval.neighbors[0] = intervals[-1]
-                intervals[-1].neighbors[1] = interval
-            if not self.contour_only:
-                interval.compute_normal()
-            intervals.append(interval)
-        self.geometry = intervals
+""" MAIN ROUTINES """
 
 
-class BivariateRefiner(Refiner):
-    def __init__(
-            self,
-            func: Callable[[np.ndarray, np.ndarray], np.ndarray],
-            sample: Sample3d,
-            contour_levels: np.ndarray,
-            contour_only: bool,
-            threshold: float,
-            n_iters: int
-    ):
-        super().__init__(
-            func, sample, contour_levels, contour_only, threshold, n_iters
-        )
-        self._delaunay: Delaunay | None = None
-
-    def _build_geometry(self) -> None:
-        if self._delaunay is None:
-            self._delaunay = Delaunay(self.data[:, :-1], incremental=True)
-        else:
-            self._delaunay.add_points(self.data[-self._n_new_data:, :-1])
-        triangles = []
-        for point_idx in self._delaunay.simplices:
-            triangle = Triangle(point_idx.tolist(), self.data)
-            if not self.contour_only:
-                triangle.compute_normal()
-            triangles.append(triangle)
-        for i, neighbors in enumerate(self._delaunay.neighbors):
-            triangle = triangles[i]
-            for j, idx in enumerate(neighbors):
-                if idx == -1:
-                    continue
-                triangle.neighbors[j] = triangles[idx]
-        self.geometry = triangles
-
-
-def refine_univariate(
-        func: Callable[[np.ndarray], np.ndarray],
-        sample: Sample2d,
+def refine(
+        func: Callable[[np.ndarray], np.ndarray] |
+              Callable[[np.ndarray, np.ndarray], np.ndarray],
+        sample: Sample2d | Sample3d,
         contour_levels: np.ndarray,
         contour_only: bool,
-        threshold: float,
+        theta: float,
+        n_iters: int
+) -> Sample2d | Sample3d:
+    """
+    Adaptively refines a sample mesh by adding points in areas of interest.
+
+    This function iteratively improves the resolution of a function sample by
+    adding new points where the mesh is considered 'bad'. A mesh element is
+    marked as bad if it is intersected by a contour level or if the local
+    curvature exceeds a specified threshold ``theta``.
+
+    The refinement loop consists of three main phases:
+    
+    1. Building the mesh structure (triangulation/intervals)
+    2. Computing badness metrics for each mesh element
+    3. Refining the mesh by adding new points based on badness criteria
+
+    Parameters
+    ----------
+    func : Callable
+        The univariate or bivariate function that is being sampled.
+    sample : Sample2d or Sample3d
+        An object containing the initial sample points.
+    contour_levels : np.ndarray
+        Contour levels to refine around.
+    contour_only : bool
+        If True, refinement is based only on contour line intersections. If
+        False, refinement is based on both contours and local curvature.
+    theta : float
+        The badness threshold in radians. Mesh elements with a maximum badness
+        (curvature angle) greater than this value will be refined.
+    n_iters : int
+        The number of refinement iterations to perform.
+
+    Returns
+    -------
+    Sample2d or Sample3d
+        A new sample object containing both the original and the new refined
+        points.
+        
+    Notes
+    -----
+    Since the refined sample points are not on a regular rectangular grid, the
+    output sample will not have a valid ``grid_shape`` attribute. The sample
+    must be resampled onto a regular grid before plotting.
+
+    This function does not modify the input ``sample``, it only returns a new
+    sample object.
+
+    The current implementation rebuilds the mesh structure in each refinement 
+    iteration, which is inefficient. Performance could be improved by locally 
+    updating the mesh structure and caching badness values for unchanged
+    regions. This would require implementing local Delaunay triangulation
+    updates using a modified Bowyer-Watson algorithm, rather than relying on
+    ``scipy.spatial.Delaunay`` which only supports full rebuilds. The adaptive
+    library (https://github.com/python-adaptive/adaptive) demonstrates this
+    approach.
+    """
+    data = sample.data
+    if sample.dim == 2:
+        return _refine_univariate(
+            func, data, contour_levels, contour_only, theta, n_iters
+        )
+    elif sample.dim == 3:
+        return _refine_bivariate(
+            func, data, contour_levels, contour_only, theta, n_iters
+        )
+    else:
+        assert False, "Invalid sample dimension"
+
+
+def _refine_univariate(
+        func: Callable[[np.ndarray], np.ndarray],
+        data: np.ndarray,
+        contour_levels: np.ndarray,
+        contour_only: bool,
+        theta: float,
         n_iters: int
 ) -> Sample2d:
-    return UnivariateRefiner(
-        func, sample, contour_levels, contour_only, threshold, n_iters
-    ).run()
+    """
+    Helper function to perform iterative refinement for univariate (2D) data.
+
+    Parameters
+    ----------
+    func : Callable
+        The univariate function being sampled.
+    data : np.ndarray
+        The array of (x, y) sample points.
+    contour_levels : np.ndarray
+        Contour levels to refine around.
+    contour_only : bool
+        Whether to refine based only on contours.
+    theta : float
+        The badness (curvature) threshold.
+    n_iters : int
+        The number of refinement iterations.
+
+    Returns
+    -------
+    Sample2d
+        A new sample object with the refined data.
+    """
+    early_exit = False
+    for _ in range(n_iters):
+        if early_exit:
+            break
+        intervals = _build_intervals(data, not contour_only)
+        _compute_badness(intervals, contour_levels, contour_only)
+        data, _, early_exit = _refine_mesh(func, data, intervals, theta)
+    return Sample2d(*data.T, None)
 
 
-def refine_bivariate(
+def _refine_bivariate(
         func: Callable[[np.ndarray, np.ndarray], np.ndarray],
-        sample: Sample3d,
+        data: np.ndarray,
         contour_levels: np.ndarray,
         contour_only: bool,
-        threshold: float,
+        theta: float,
         n_iters: int
 ) -> Sample3d:
-    return BivariateRefiner(
-        func, sample, contour_levels, contour_only, threshold, n_iters
-    ).run()
+    """
+    Helper function to perform iterative refinement for bivariate (3D) data.
+
+    Parameters
+    ----------
+    func : Callable
+        The bivariate function being sampled.
+    data : np.ndarray
+        The array of (x, y, z) sample points.
+    contour_levels : np.ndarray
+        Contour levels to refine around.
+    contour_only : bool
+        Whether to refine based only on contours.
+    theta : float
+        The badness (curvature) threshold.
+    n_iters : int
+        The number of refinement iterations.
+
+    Returns
+    -------
+    Sample3d
+        A new sample object with the refined data.
+    """
+    early_exit = False
+    delaunay = None
+    n_new_samples = 0
+    for _ in range(n_iters):
+        if early_exit:
+            break
+        triangles, delaunay = _build_triangles(
+            data, not contour_only, delaunay, n_new_samples
+        )
+        _compute_badness(triangles, contour_levels, contour_only)
+        data, n_new_samples, early_exit = _refine_mesh(
+            func, data, triangles, theta
+        )
+    return Sample3d(*data.T, None)
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+def _build_intervals(
+        data: np.ndarray,
+        compute_normal: bool
+) -> list[_Interval]:
+    """
+    Constructs a list of Interval objects from 1D point data.
 
-    f = lambda x, y: np.sin(np.sqrt(x ** 2 + y ** 2))
-    x = np.linspace(-5, 5, 10)
-    y = np.linspace(-5, 5, 10)
-    X, Y = np.meshgrid(x, y)
-    Z = f(X, Y)
+    Parameters
+    ----------
+    data : np.ndarray
+        The sorted 2D array of (x, y) sample points.
+    compute_normal : bool
+        If True, computes the normal vector for each interval.
 
-    sample = Sample3d(X.ravel(), Y.ravel(), Z.ravel(), (10, 10))
-    sample = refine_bivariate( f, sample, [0.5, 0.75, -0.75], False, 0.1745, 5)
-    # sample = resample_bivariate(sample, "linear")
-    plt.contourf(X, Y, Z)
-    plt.scatter(*sample.data[:, :-1].T, alpha=0.3, c='grey', s=3)
-    plt.show()
+    Returns
+    -------
+    list[Interval]
+        A list of connected Interval objects.
+    """
+    data = data[np.argsort(data[:, 0])]
+    intervals = []
+    for i in range(data.shape[0] - 1):
+        interval = _Interval((i, i + 1), data)
+        if i > 0:
+            interval.neighbors[0] = intervals[-1]
+            intervals[-1].neighbors[1] = interval
+        if compute_normal:
+            interval.compute_normal()
+        intervals.append(interval)
+    return intervals
+
+
+def _build_triangles(
+        data: np.ndarray,
+        compute_normal: bool,
+        delaunay: Delaunay | None,
+        n_new_samples: int
+) -> tuple[list[_Triangle], Delaunay]:
+    """
+    Constructs a list of Triangle objects using Delaunay triangulation.
+
+    This function uses ``scipy.spatial.Delaunay`` to perform the triangulation.
+    While there are various algorithms for Delaunay triangulation (e.g.,
+    Bowyer-Watson, Fortune's sweep), scipy.spatial.Delaunay uses Qhull. The
+    algorithm works by lifting the 2D points onto a 3D paraboloid, computing
+    their convex hull, and projecting the lower hull faces back onto the 2D
+    plane to obtain the Delaunay triangulation. For details, see:
+
+    - Delaunay triangulation : https://en.wikipedia.org/wiki/Delaunay_triangulation
+    - Triangulation theory : https://i.cs.hku.hk/~provinci/training11/delaunay.pdf
+    - Bowyer-Watson : https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
+    - Fortune's sweep : https://en.wikipedia.org/wiki/Fortune%27s_algorithm
+    - Qhull : https://en.wikipedia.org/wiki/Quickhull
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The 3D array of (x, y, z) sample points.
+    compute_normal : bool
+        If True, computes the normal vector for each triangle.
+    delaunay : Delaunay or None
+        An existing Delaunay object for incremental updates. If None, a new
+        triangulation is created.
+    n_new_samples : int
+        The number of new points added to the data since the last update.
+
+    Returns
+    -------
+    list[Triangle]
+        A list of connected Triangle objects forming the Delaunay triangulation.
+    Delaunay
+        The updated or newly created Delaunay triangulation object used for
+        incremental updates.
+    """
+    if delaunay is None:
+        delaunay = Delaunay(data[:, :-1], incremental=True)
+    else:
+        delaunay = delaunay.add_points(data[-n_new_samples:, :-1])
+    triangles = []
+    for point_idx in delaunay.simplices:
+        triangle = _Triangle(tuple(point_idx), data)
+        if compute_normal:
+            triangle.compute_normal()
+        triangles.append(triangle)
+    for i, neighbors in enumerate(delaunay.neighbors):
+        triangle = triangles[i]
+        for j, idx in enumerate(neighbors):
+            if idx == -1:
+                continue
+            triangle.neighbors[j] = triangles[idx]
+    return triangles, delaunay
+
+
+def _compute_badness(
+        meshes: list[_Interval] | list[_Triangle],
+        contour_levels: np.ndarray,
+        contour_only: bool
+) -> None:
+    """
+    Calculates and assigns a 'badness' metric to each mesh element.
+
+    The badness is determined by two criteria:
+    
+    1. Curvature : The curvature between two adjacent mesh elements.
+    2. Contour Intersection : A badness of inf is assigned if any contour level
+        passes through the element. This ensures that mesh elements intersecting
+        with contour lines are always refined.
+
+    Parameters
+    ----------
+    meshes : list[Interval] or list[Triangle]
+        The list of mesh elements to evaluate.
+    contour_levels : np.ndarray
+        Contour levels to refine around.
+    contour_only : bool
+        If True, only the contour intersection criterion is used.
+    """
+    for mesh in meshes:
+        if not contour_only:
+            for i, neighbor in enumerate(mesh.neighbors):
+                if not np.isnan(mesh.badness[i]) or neighbor is None:
+                    continue
+                curvature = _compute_curvature(mesh, neighbor)
+                j = neighbor.neighbor_idx(mesh)
+                mesh.badness[i] = neighbor.badness[j] = curvature
+
+        values = mesh.vertices()[:, -1]
+        vmin, vmax = np.nanmin(values), np.nanmax(values)
+        if ((contour_levels > (vmin - FLT_EPS)) &
+            (contour_levels < (vmax + FLT_EPS))).any():
+            mesh.badness[-1] = np.inf
+        else:
+            mesh.badness[-1] = -np.inf
+
+
+def _compute_curvature(
+        mesh: _Interval | _Triangle,
+        neighbor: _Interval | _Triangle
+) -> float:
+    """
+    Computes the curvature between two adjacent mesh elements.
+
+    The curvature is approximated by measuring the change in normal vectors
+    between adjacent mesh elements rather than computing the exact geometric
+    curvature. For more details, see:
+
+    - Curvature : https://en.wikipedia.org/wiki/Curvature
+    - Relation b/w curvature and normal vector : https://math.libretexts.org/Bookshelves/Calculus/Supplemental_Modules_%28Calculus%29/Vector_Calculus/2%3A_Vector-Valued_Functions_and_Motion_in_Space/2.3%3A_Curvature_and_Normal_Vectors_of_a_Curve
+
+    Parameters
+    ----------
+    mesh : Interval or Triangle
+        The first mesh element.
+    neighbor : Interval or Triangle
+        The adjacent mesh element.
+
+    Returns
+    -------
+    float
+        The angle between the normal vectors in radians.
+    """
+    v, w = mesh.normal, neighbor.normal
+    angle = np.arccos(min(np.dot(v, w), 1))
+    return angle if not np.isnan(angle) else -np.inf
+
+
+def _refine_mesh(
+        func: Callable[[np.ndarray], np.ndarray] |
+              Callable[[np.ndarray, np.ndarray], np.ndarray],
+        data: np.ndarray,
+        meshes: list[_Interval] | list[_Triangle],
+        theta: float
+) -> tuple[np.ndarray, int, bool]:
+    """
+    Refines the mesh by adding new sample points.
+
+    For triangle meshes, refinement is performed by adding points at edge
+    midpoints rather than triangle centroids. While using centroids would result
+    in fewer new points (splitting each triangle into 3 vs 4), it can lead to
+    numerical instability due to the creation of needle-shaped triangles with
+    poor aspect ratios.
+
+    Parameters
+    ----------
+    func : Callable
+        The function to sample for the new points.
+    data : np.ndarray
+        The current array of sample points.
+    meshes : list[Interval] or list[Triangle]
+        The list of mesh elements.
+    theta : float
+        The badness threshold.
+
+    Returns
+    -------
+    np.ndarray
+        The updated data array with new points.
+    int
+        The number of new samples added.
+    bool
+        A boolean indicating if an early exit is warranted (no new points were
+        added).
+    """
+    coords = []
+    for mesh in meshes:
+        if mesh.max_badness() > theta:
+            coords.append(mesh.midpoints())
+    if not coords:
+        return data, 0, True
+    coords = np.vstack(coords)
+    values = np.atleast_2d(func(*coords.T)).T
+    new_data = np.hstack((coords, values))
+    n_new_samples = new_data.shape[0]
+    data = np.vstack((data, new_data))
+    return data, n_new_samples, False

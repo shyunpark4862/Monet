@@ -27,13 +27,13 @@ from typing import Literal
 import numpy as np
 from scipy.interpolate import griddata
 
-from . import sampler
+from .sampler import Sample2d, Sample3d
 
 
 def resample(
-        sample: sampler.Sample2d | sampler.Sample3d,
+        sample: Sample2d | Sample3d,
         method: Literal["linear", "cubic", "nearest"] = "linear",
-) -> sampler.Sample2d | sampler.Sample3d:
+) -> Sample2d | Sample3d:
     """
     Resamples univariate (2D) or bivariate (3D) sample data to a rectangular
     grid.
@@ -49,7 +49,7 @@ def resample(
 
     Parameters
     ----------
-    sample : sampler.Sample2d or sampler.Sample3d
+    sample : Sample2d or Sample3d
         The input sample object to be resampled.
     method : {"linear", "cubic", "nearest"}, optional (default: "linear")
         The interpolation method to use for resampling. This parameter is only
@@ -60,18 +60,24 @@ def resample(
 
     Returns
     -------
-    sampler.Sample2d or sampler.Sample3d
+    Sample2d or =Sample3d
         A new Sample object containing the resampled data.
 
     Raises
     ------
     AssertionError
         If the dimension of the input ``sample`` is not 2 or 3.
+
+    Notes
+    -----
+    This function does not modify the input ``sample``, it only returns a new
+    sample object.
     """
+    data = sample.data
     if sample.dim == 2:
-        return _resample_univariate(sample.data, 1e-6)
+        return _resample_univariate(data, 1e-6)
     elif sample.dim == 3:
-        return _resample_bivariate(sample.data, method, 1e-6)
+        return _resample_bivariate(data, method, 1e-6)
     else:
         assert False, "Invalid sample dimension"
 
@@ -79,7 +85,7 @@ def resample(
 def _resample_univariate(
         data: np.ndarray,
         eps: float
-) -> sampler.Sample2d:
+) -> Sample2d:
     """
     Resamples univariate (2D) data to a rectangular grid.
 
@@ -109,14 +115,14 @@ def _resample_univariate(
         if x[i] - x_keep[-1] > tol:
             x_keep.append(x[i])
             y_keep.append(y[i])
-    return sampler.Sample2d(np.array(x_keep), np.array(y_keep), len(x_keep))
+    return Sample2d(np.array(x_keep), np.array(y_keep), len(x_keep))
 
 
 def _resample_bivariate(
         data: np.ndarray,
         method: Literal["linear", "cubic", "nearest"],
         eps: float
-) -> sampler.Sample3d:
+) -> Sample3d:
     """
     Resamples bivariate (3D) data to a rectangular grid.
 
@@ -163,7 +169,7 @@ def _resample_bivariate(
     X, Y = np.meshgrid(x, y, indexing="ij")
     x, y = X.ravel(), Y.ravel()
     z = griddata(data[:, :-1], z, np.column_stack((x, y)), method)
-    return sampler.Sample3d(x, y, z, grid_shape)
+    return Sample3d(x, y, z, grid_shape)
 
 
 def _sort(arr: np.ndarray, eps: float) -> np.ndarray:
