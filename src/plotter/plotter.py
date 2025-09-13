@@ -56,10 +56,10 @@ def _apply_style(method):
 
 class Plotter:
     """
-    A thin wrapper class around ``matplotlib`` that provides consistent styling 
-    and simplified parameter options. It handles commonly adjusted graphic 
-    settings automatically while still allowing direct access to figure and axes 
-    objects for advanced customization when needed.
+    A thin wrapper class around matplotlib that provides consistent styling and
+    simplified parameter options. It handles commonly adjusted graphic settings
+    automatically while still allowing direct access to figure and axes objects
+    for advanced customization when needed.
 
     This class is designed to create single plots (overlapping plots are 
     possible) rather than multiple subplots in one figure. For layouts requiring

@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 from scipy.spatial import Delaunay
 
-from sample import Sample, Sample2d, Sample3d
+from sampler import Sample, Sample2d, Sample3d
 
 FLT_EPS: float = np.finfo(float).eps
 

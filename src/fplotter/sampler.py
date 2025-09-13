@@ -238,7 +238,7 @@ class Sample3d(Sample):
 """ SAMPLING FUNCTIONS """
 
 
-def sample_uniform(
+def sample(
         func: Callable[[np.ndarray], np.ndarray] |
               Callable[[np.ndarray, np.ndarray], np.ndarray],
         n_samples: int | tuple[int, int],
@@ -258,15 +258,18 @@ def sample_uniform(
     func : Callable
         The univariate (y=f(x)) or bivariate (z=f(x,y)) function to sample.
     n_samples : int or tuple[int, int]
-        For a univariate function, the number of samples (int). For a bivariate 
-        function, a tuple with the number of samples for each axis, (nx, ny).
+        For a univariate ``func``, the number of samples (int). For a bivariate 
+        ``func``, a tuple with the number of samples for each axis, (nx, ny). If
+        an integer value is provided for a bivariate ``func``, the same number
+        of samples will be used for both axes (i.e., ``n_samples`` points on
+        both x and y axes).
     xbound : tuple[float, float]
         The range (start, end) of the x-axis to sample. The start value must be
         less than the end value.
     ybound : tuple[float, float] or None, optional (default: None)
         The range (start, end) of the y-axis to sample, for bivariate functions.
         The start value must be less than the end value. This parameter is 
-        required when sampling bivariate functions, otherwise the function will
+        required when sampling bivariate ``func``, otherwise the ``func`` will
         be treated as univariate which may result in errors or unexpected 
         behavior.
 
@@ -277,12 +280,14 @@ def sample_uniform(
         ``Sample3d`` object for a bivariate function.
     """
     if ybound is None:
-        return _sample_uniform_univariate(func, n_samples, xbound)
+        return _sample_univariate(func, n_samples, xbound)
     else:
-        return _sample_uniform_bivariate(func, n_samples, xbound, ybound)
+        if isinstance(n_samples, int):
+            n_samples = (n_samples, n_samples)
+        return _sample_bivariate(func, n_samples, xbound, ybound)
 
 
-def _sample_uniform_univariate(
+def _sample_univariate(
         func: Callable[[np.ndarray], np.ndarray],
         n_samples: int,
         xbound: tuple[float, float]
@@ -309,7 +314,7 @@ def _sample_uniform_univariate(
     return Sample2d(x, y, n_samples)
 
 
-def _sample_uniform_bivariate(
+def _sample_bivariate(
         func: Callable[[np.ndarray, np.ndarray], np.ndarray],
         n_samples: tuple[int, int],
         xbound: tuple[float, float],
