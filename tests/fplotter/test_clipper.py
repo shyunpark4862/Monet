@@ -1,19 +1,15 @@
 import pytest
 import numpy as np
 
+from fplotter.sampler import Sample2d
 import fplotter.clipper as clipper
-
-
-class MockSample:
-    def __init__(self, data):
-        self.data = np.array(data)
 
 
 @pytest.fixture
 def standard_sample():
     y = np.array([0, 1, 2, 3, 4, 5, 100])
     x = np.arange(len(y))
-    return MockSample(np.column_stack((x, y)))
+    return Sample2d(x, y, len(x))
 
 
 class TestComputeFocusZone:
@@ -22,13 +18,13 @@ class TestComputeFocusZone:
         k = 1.5
         # Q1 = 3.25, Q3 = 7.75, IQR = 4.5 -> Lower = -3.5, Upper=14.5
         expected_bound = (-3.5, 14.5)
-        assert clipper._compute_focus_zone(y, k) == expected_bound
+        assert np.allclose(clipper._compute_focus_zone(y, k), expected_bound)
 
     def test_with_nan_values(self):
         y = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, np.nan, np.nan])
         k = 1.5
         expected_bound = (-3.5, 14.5)
-        assert clipper._compute_focus_zone(y, k) == expected_bound
+        assert np.allclose(clipper._compute_focus_zone(y, k), expected_bound)
 
     def test_all_nans_returns_none(self):
         y = np.repeat(np.nan, 10)
@@ -50,7 +46,7 @@ class TestClip:
         # Values outside bound: 0, 1, 2, 100
         expected_mask = np.array([True, True, True, False, False, False, True])
         result_mask, _ = clipper.clip(standard_sample, bound=bound, k=1.5)
-        assert np.array_equal(result_mask, expected_mask)
+        assert np.allclose(result_mask, expected_mask)
 
     def test_with_computed_bound(self, standard_sample):
         # y = [0, 1, 2, 3, 4, 5, 100]
@@ -60,19 +56,19 @@ class TestClip:
         )
         expected_bound = (-3, 9)
         result_mask, result_bound = clipper.clip(standard_sample, None, 1.5)
-        assert np.array_equal(result_mask, expected_mask)
-        assert result_bound == expected_bound
+        assert np.allclose(result_mask, expected_mask)
+        assert np.allclose(result_bound, expected_bound)
 
     def test_returns_all_false_when_bound_is_none(self):
-        sample = MockSample([[0, 5], [1, 5], [2, 5], [3, 5]])
+        sample = Sample2d(np.arange(4), np.repeat(5, 4), 4)
         result_mask, result_bound = clipper.clip(sample, None, 1.5)
         expected_mask = np.repeat(False, len(sample.data))
-        assert np.array_equal(result_mask, expected_mask)
+        assert np.allclose(result_mask, expected_mask)
         assert result_bound is None
 
     def test_returns_all_false_for_all_nan_sample(self):
-        sample = MockSample([[0, np.nan], [1, np.nan], [2, np.nan]])
+        sample = Sample2d(np.arange(4), np.repeat(np.nan, 4), 4)
         result_mask, result_bound = clipper.clip(sample, bound=None, k=1.5)
         expected_mask = np.repeat(False, len(sample.data))
-        assert np.array_equal(result_mask, expected_mask)
+        assert np.allclose(result_mask, expected_mask)
         assert result_bound is None

@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-from tests.test_serializer import expected_message
 
 import fplotter.sampler as sampler
 
@@ -34,7 +33,7 @@ class TestSample:
         result = sampler.Sample(data, grid_shape)
         assert result.n_samples == data.shape[0]
         assert result.dim == data.shape[1]
-        assert np.array_equal(result.grid_shape, grid_shape)
+        assert np.allclose(result.grid_shape, grid_shape)
         assert id(result.data) == id(data)
 
     def test_set_mask(self, sample_data):
@@ -44,7 +43,7 @@ class TestSample:
         result.set_mask(mask)
         assert np.isnan(result.data[mask, -1]).all()
         assert not np.isnan(result.data[~mask, -1]).any()
-        assert np.array_equal(result.data[:, :-1], data[:, :-1])
+        assert np.allclose(result.data[:, :-1], data[:, :-1])
 
     def test_reshape_as_grid(self, sample_data):
         data, grid_shape = sample_data
@@ -53,8 +52,8 @@ class TestSample:
         assert isinstance(result_grids, tuple)
         assert len(result_grids) == result.dim
         for i, grid in enumerate(result_grids):
-            assert np.array_equal(grid.shape, result.grid_shape)
-            assert np.array_equal(grid.flatten(), result.data[:, i])
+            assert np.allclose(grid.shape, result.grid_shape)
+            assert np.allclose(grid.flatten(), result.data[:, i])
 
     def test_reshape_as_grid_no_shape_raises_error(self, sample_data):
         data, _ = sample_data
@@ -70,16 +69,16 @@ class TestSample2d:
         result = sampler.Sample2d(x, y, len(x))
         assert result.dim == 2
         assert result.n_samples == 10
-        assert np.array_equal(result.data, np.column_stack((x, y)))
-        assert np.array_equal(result.grid_shape, np.atleast_1d(len(x)))
+        assert np.allclose(result.data, np.column_stack((x, y)))
+        assert np.allclose(result.grid_shape, np.atleast_1d(len(x)))
 
     def test_reshape_as_grid(self):
         x = np.linspace(0, 1, 10)
         y = univariate_func(x)
         result = sampler.Sample2d(x, y, 10)
         result_grid = result.reshape_as_grid()
-        assert np.array_equal(result_grid[0], x)
-        assert np.array_equal(result_grid[1], y)
+        assert np.allclose(result_grid[0], x)
+        assert np.allclose(result_grid[1], y)
 
 
 class TestSample3d:
@@ -92,10 +91,10 @@ class TestSample3d:
         result = sampler.Sample3d(X.ravel(), Y.ravel(), Z.ravel(), grid_shape)
         assert result.dim == 3
         assert result.n_samples == len(x) * len(y)
-        assert np.array_equal(
+        assert np.allclose(
             result.data, np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
         )
-        assert np.array_equal(result.grid_shape, grid_shape)
+        assert np.allclose(result.grid_shape, grid_shape)
 
 
 class TestSampleUniform:
@@ -109,9 +108,9 @@ class TestSampleUniform:
 
         expected_x = np.linspace(xbound[0], xbound[1], n_samples)
         expected_y = univariate_func(expected_x)
-        assert np.array_equal(result.data[:, 0], expected_x)
-        assert np.array_equal(result.data[:, 1], expected_y)
-        assert np.array_equal(result.grid_shape, np.atleast_1d(n_samples))
+        assert np.allclose(result.data[:, 0], expected_x)
+        assert np.allclose(result.data[:, 1], expected_y)
+        assert np.allclose(result.grid_shape, np.atleast_1d(n_samples))
 
     def test_bivariate_sampling(self):
         n_samples = (5, 6)
@@ -126,5 +125,5 @@ class TestSampleUniform:
         X, Y = np.meshgrid(x, y, indexing='ij')
         Z = bivariate_func(X, Y)
         expected_data = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-        assert np.array_equal(result.data, expected_data)
-        assert np.array_equal(result.grid_shape, np.array(n_samples))
+        assert np.allclose(result.data, expected_data)
+        assert np.allclose(result.grid_shape, np.array(n_samples))

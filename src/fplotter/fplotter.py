@@ -3,8 +3,7 @@ from collections.abc import Callable
 import numpy as np
 
 from src.plotter.plotter import Plotter
-from . import sampler, clipper
-from resampler import resample_bivariate, resample_univariate
+from . import sampler, clipper, resampler
 from refiner import refine_bivariate, refine_univariate
 
 
@@ -38,8 +37,9 @@ class FunctionPlotter(Plotter):
             sample = refine_univariate(
                 func, sample, list(ylimit), False, amr_threshold, n_iters
             )
-            sample = resample_univariate(sample)
-            clipped, _ = clip_univariate(sample, ybound, clip_coefficient)
+            sample = resampler.resample(sample)
+            mask, _ = clipper.clip(sample, ybound, clip_coefficient)
+            # TODO: clip yourself
         super().line(*clipped.reshape_as_grid(), **kwargs)
         if ylimit is not None:
             super().axis_limit(ylimit=ylimit)
@@ -62,12 +62,14 @@ class FunctionPlotter(Plotter):
         sample = sampler.sample(func, n_samples, xbound, ybound)
         if auto_clip or zbound is not None:
             mask, zlimit = clipper.clip(sample, zbound, clip_coefficient)
+            # TODO: clip yourself
         if adaptive_refine:
             sample = refine_bivariate(
                 func, sample, list(zlimit), True, amr_threshold, n_iters
             )
-            sample = resample_bivariate(sample, "linear")
-            clipped, _ = clip_bivariate(sample, zbound, clip_coefficient)
+            sample = resampler.resample(sample, "linear")
+            mask, _ = clipper.clip(sample, zbound, clip_coefficient)
+            # TODO: clip yourself
         if clip_line and zlimit is not None:
             self._draw_clip_shadow(sample, zlimit)
         super().contour(*clipped.reshape_as_grid(), **kwargs)
@@ -92,12 +94,14 @@ class FunctionPlotter(Plotter):
         sample = sampler.sample(func, n_samples, xbound, ybound)
         if auto_clip or zbound is not None:
             mask, zlimit = clipper.clip(sample, zbound, clip_coefficient)
+            # TODO: clip yourself
         if adaptive_refine:
             sample = refine_bivariate(
                 func, sample, list(zlimit), False, amr_threshold, n_iters
             )
-            sample = resample_bivariate(sample, "linear")
-            clipped, _ = clip_bivariate(sample, zbound, clip_coefficient)
+            sample = resampler.resample(sample, "linear")
+            mask, _ = clipper.clip(sample, zbound, clip_coefficient)
+            # TODO: clip yourself
         if clip_line and zlimit is not None:
             self._draw_clip_shadow(sample, zlimit)
         super().heatmap(*clipped.reshape_as_grid(), **kwargs)

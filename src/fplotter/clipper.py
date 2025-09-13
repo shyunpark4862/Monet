@@ -1,3 +1,27 @@
+"""
+The MIT License
+
+Copyright (c) 2025 SangHyun Park
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 import numpy as np
 
 from . import sampler
@@ -44,16 +68,16 @@ def clip(
     This function does not modify the input ``sample``, it only returns a mask 
     array.
     """
-    y = sample.data[:, -1]
+    value = sample.data[:, -1]
     if bound is None:
-        bound = _compute_focus_zone(y, k)
+        bound = _compute_focus_zone(value, k)
     if bound is None:
-        return np.repeat(False, len(y)), bound
-    return (y < bound[0]) | (y > bound[1]), bound
+        return np.repeat(False, len(value)), bound
+    return (value < bound[0]) | (value > bound[1]), bound
 
 
 def _compute_focus_zone(
-        y: np.ndarray,
+        value: np.ndarray,
         k: float
 ) -> tuple[float, float] | None:
     """
@@ -67,11 +91,11 @@ def _compute_focus_zone(
 
     - Method overview: https://en.wikipedia.org/wiki/Outlier
     - Original paper: Tukey, John Wilder. Exploratory data analysis. Vol. 2.
-                      Reading, MA: Addison-wesley, 1977.
+        Reading, MA: Addison-wesley, 1977.
 
     Parameters
     ----------
-    y : np.ndarray of shape (n_samples,)
+    value : np.ndarray of shape (n_samples,)
         The 1D data array on which to perform the calculation. NaN values in
         the array are automatically ignored.
     k : float
@@ -86,9 +110,9 @@ def _compute_focus_zone(
         impossible to calculate a valid range.
 
     """
-    if np.isnan(y).all():
+    if np.isnan(value).all():
         return None
-    q1, q3 = np.nanpercentile(y, (25, 75))
+    q1, q3 = np.nanpercentile(value, (25, 75))
     iqr = q3 - q1
     if np.isclose(k * iqr, 0, atol=1e-6):
         return None
