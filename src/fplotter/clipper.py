@@ -68,7 +68,7 @@ def clip(
     This function does not modify the input ``sample``, it only returns a mask 
     array.
     """
-    value = sample.data[:, -1]
+    value = sample.data.data[:, -1]
     if bound is None:
         bound = _compute_focus_zone(value, k)
     if bound is None:

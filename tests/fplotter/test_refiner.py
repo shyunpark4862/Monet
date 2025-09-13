@@ -1,5 +1,4 @@
 import numpy as np
-from dataclasses import dataclass
 
 from fplotter.sampler import Sample2d, Sample3d
 from fplotter.refiner import FLT_EPS, _normalize, _Interval, _Triangle, \
@@ -191,7 +190,7 @@ class TestRefineIntegration:
         x = np.linspace(0, np.pi, 5)
         sample = Sample2d(x, univariate_func(x), len(x))
         result = refine(
-            univariate_func, sample, np.array([]), False, 0.5, 1
+            univariate_func, sample, None, False, 0.5, 1
         )
         assert len(result.data) > sample.n_samples
         assert result.grid_shape is None

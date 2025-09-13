@@ -24,7 +24,6 @@ SOFTWARE.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Final
@@ -277,7 +276,7 @@ def refine(
         func: Callable[[np.ndarray], np.ndarray] |
               Callable[[np.ndarray, np.ndarray], np.ndarray],
         sample: Sample2d | Sample3d,
-        contour_levels: np.ndarray,
+        contour_levels: np.ndarray | None,
         contour_only: bool,
         theta: float,
         n_iters: int
@@ -302,7 +301,7 @@ def refine(
         The univariate or bivariate function that is being sampled.
     sample : Sample2d or Sample3d
         An object containing the initial sample points.
-    contour_levels : np.ndarray
+    contour_levels : np.ndarray or None
         Contour levels to refine around.
     contour_only : bool
         If True, refinement is based only on contour line intersections. If
@@ -337,7 +336,7 @@ def refine(
     library (https://github.com/python-adaptive/adaptive) demonstrates this
     approach.
     """
-    data = sample.data
+    data = sample.data.data
     if sample.dim == 2:
         return _refine_univariate(
             func, data, contour_levels, contour_only, theta, n_iters
@@ -353,7 +352,7 @@ def refine(
 def _refine_univariate(
         func: Callable[[np.ndarray], np.ndarray],
         data: np.ndarray,
-        contour_levels: np.ndarray,
+        contour_levels: np.ndarray | None,
         contour_only: bool,
         theta: float,
         n_iters: int
@@ -367,7 +366,7 @@ def _refine_univariate(
         The univariate function being sampled.
     data : np.ndarray
         The array of (x, y) sample points.
-    contour_levels : np.ndarray
+    contour_levels : np.ndarray or None
         Contour levels to refine around.
     contour_only : bool
         Whether to refine based only on contours.
@@ -398,7 +397,7 @@ def _refine_univariate(
 def _refine_bivariate(
         func: Callable[[np.ndarray, np.ndarray], np.ndarray],
         data: np.ndarray,
-        contour_levels: np.ndarray,
+        contour_levels: np.ndarray | None,
         contour_only: bool,
         theta: float,
         n_iters: int
@@ -412,7 +411,7 @@ def _refine_bivariate(
         The bivariate function being sampled.
     data : np.ndarray
         The array of (x, y, z) sample points.
-    contour_levels : np.ndarray
+    contour_levels : np.ndarray or None
         Contour levels to refine around.
     contour_only : bool
         Whether to refine based only on contours.
@@ -580,7 +579,7 @@ def _build_triangles(
 
 def _compute_badness(
         meshes: list[_Interval] | list[_Triangle],
-        contour_levels: np.ndarray,
+        contour_levels: np.ndarray or None,
         contour_only: bool
 ) -> None:
     """
@@ -597,7 +596,7 @@ def _compute_badness(
     ----------
     meshes : list[Interval] or list[Triangle]
         The list of mesh elements to evaluate.
-    contour_levels : np.ndarray
+    contour_levels : np.ndarray or None
         Contour levels to refine around.
     contour_only : bool
         If True, only the contour intersection criterion is used.
@@ -611,6 +610,8 @@ def _compute_badness(
                 j = neighbor.neighbor_idx(mesh)
                 mesh.badness[i] = neighbor.badness[j] = curvature
 
+        if contour_levels is None:
+            continue
         values = mesh.vertices()[:, -1]
         vmin, vmax = np.nanmin(values), np.nanmax(values)
         if ((contour_levels > (vmin - FLT_EPS)) &
@@ -694,7 +695,6 @@ def _refine_mesh(
     """
     coords = []
     for mesh in meshes:
-        print(mesh.area)
         if mesh.area > total_area * eps and mesh.max_badness() > theta:
             coords.append(mesh.midpoints())
     if not coords:

@@ -147,7 +147,8 @@ class Plotter:
             The transparency of all plot elements (line, marker face, marker 
             edge). Value ranges from 0 (completely transparent) to 1 (completely
             opaque). Cannot be set independently for different elements.
-        linecolor : str or tuple[float, float, float], optional (default: None)
+        linecolor : str or tuple[float, float, float] or None, optional
+                    (default: None)
             The color of the line. Can be a color name as string (e.g. "red") 
             or RGB values as a tuple of floats between 0 and 1. Transparency 
             should be set via the ``alpha`` parameter, not as a fourth tuple 
@@ -157,11 +158,11 @@ class Plotter:
         linestyle : {"solid", "dashed", "dashdot", "dotted"}, optional
                     (default: "solid")
             The style of the line.
-        marker : str, optional (default: None)
+        marker : str or None, optional (default: None)
             The marker style for the data points.
         markersize : float, optional (default: 5)
             The size of the markers.
-        markeredgecolor : str or tuple[float, float, float], optional
+        markeredgecolor : str or tuple[float, float, float] or None, optional
                           (default: None)
             The color of the marker edges. Can be a color name as string 
             (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
@@ -169,16 +170,16 @@ class Plotter:
             fourth tuple value.
         markeredgewidth : float, optional (default: 0)
             The width of the marker edges.
-        markerfacecolor : str or tuple[float, float, float], optional
+        markerfacecolor : str or tuple[float, float, float] or None, optional
                           (default: None)
             The color of the marker face. Can be a color name as string 
             (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
             Transparency should be set via the ``alpha`` parameter, not as a 
             fourth tuple value.
-        zorder : int, optional (default: None)
+        zorder : int or None, optional (default: None)
             The z-order for plotting. Higher values appear in front of elements
             with lower values.
-        legend : str, optional (default: None)
+        legend : str or None, optional (default: None)
             The label for the line in the legend. Note that this only registers
             the label - the legend itself must be displayed by calling the
             ``legend()`` method.
@@ -205,7 +206,8 @@ class Plotter:
                 "solid", "dashed", "dashdot", "dotted"
             ] = "solid",
             colorbar: bool = True,
-            label: bool = True
+            label: bool = True,
+            zorder: int | None = None
     ) -> None:
         """
         Creates a contour plot.
@@ -246,7 +248,8 @@ class Plotter:
         color_map : str, optional (default: "viridis")
             The colormap for the contour lines. Ignored if ``linecolor`` is
             provided.
-        linecolor : str or tuple[float, float, float], optional (default: None)
+        linecolor : str or tuple[float, float, float] or None, optional
+                    (default: None)
             The color of the contour lines. Can be a color name as string 
             (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
             Transparency should be set via the ``alpha`` parameter, not as a 
@@ -320,7 +323,7 @@ class Plotter:
             The colormap for the heatmap.
         contour : bool, optional (default: True)
             Whether to overlay contour lines.
-        levels : int or Iterable[float], optional (default: None)
+        levels : int or Iterable[float] or None, optional (default: None)
             The number of contour levels or specific levels.
         linecolor : str or tuple[float, float, float], optional
                     (default: "white")
@@ -398,7 +401,7 @@ class Plotter:
         dpi : int or {"figure"}, optional (default: "figure")
             The resolution for saving the figure. If "figure", uses the same dpi
             value as the created figure.
-        format_ : str, optional (default: None)
+        format_ : str or None, optional (default: None)
             The file format. If provided, uses this format. If None, infers the
             format from the ``file_name`` extension. If both are None, defaults
             to PNG format.
@@ -466,7 +469,7 @@ class Plotter:
         n_cols : int, optional (default: 1)
             The number of columns in the legend. Legend items are arranged by
             filling horizontally first, then vertically.
-        title : str, optional (default: None)
+        title : str or None, optional (default: None)
             The title for the legend.
         """
         self.axes.legend(
@@ -485,9 +488,9 @@ class Plotter:
 
         Parameters
         ----------
-        xlabel : str, optional (default: None)
+        xlabel : str or None, optional (default: None)
             The label for the x-axis.
-        ylabel : str, optional (default: None)
+        ylabel : str or None, optional (default: None)
             The label for the y-axis.
         """
         self.axes.set_xlabel(xlabel)
@@ -532,9 +535,9 @@ class Plotter:
 
         Parameters
         ----------
-        xlimit : tuple[float, float], optional (default: None)
+        xlimit : tuple[float, float] or None, optional (default: None)
             The limits for the x-axis.
-        ylimit : tuple[float, float], optional (default: None)
+        ylimit : tuple[float, float] or None, optional (default: None)
             The limits for the y-axis.
         
         

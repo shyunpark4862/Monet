@@ -73,7 +73,7 @@ def resample(
     This function does not modify the input ``sample``, it only returns a new
     sample object.
     """
-    data = sample.data
+    data = sample.data.data
     if sample.dim == 2:
         return _resample_univariate(data, 1e-6)
     elif sample.dim == 3:

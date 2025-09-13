@@ -1,8 +1,10 @@
 import pytest
 import numpy as np
+import numpy.ma as ma
 
 import fplotter.sampler as sampler
 from test_functions import univariate_func, bivariate_func, trivariate_func
+
 
 @pytest.fixture
 def sample_data():
@@ -11,7 +13,7 @@ def sample_data():
     z = np.linspace(0, 1, 5)
     X, Y, Z = np.meshgrid(x, y, z)
     W = trivariate_func(X, Y, Z)
-    data = np.column_stack((X.ravel(), Y.ravel(), Z.ravel(), W.ravel()))
+    data = ma.column_stack((X.ravel(), Y.ravel(), Z.ravel(), W.ravel()))
     return data, np.array([len(x), len(y), len(z)])
 
 
@@ -26,28 +28,42 @@ class TestSample:
 
     def test_set_mask(self, sample_data):
         data, grid_shape = sample_data
-        result = sampler.Sample(data.copy(), grid_shape)
-        mask = np.array([True, False] * (result.n_samples // 2))
+        result = sampler.Sample(data, grid_shape)
+        mask = np.repeat(False, result.n_samples)
+        mask[0] = True
         result.set_mask(mask)
-        assert np.isnan(result.data[mask, -1]).all()
-        assert not np.isnan(result.data[~mask, -1]).any()
-        assert np.allclose(result.data[:, :-1], data[:, :-1])
+
+        assert not (result.data.mask[:,:-1].any())
+        assert result.data.mask[0, -1]
+        assert not (result.data.mask[1:,-1].any())
 
     def test_reshape_as_grid(self, sample_data):
         data, grid_shape = sample_data
         result = sampler.Sample(data, grid_shape)
-        result_grids = result.reshape_as_grid()
+        result_grids = result.reshape_as_grid(False)
         assert isinstance(result_grids, tuple)
         assert len(result_grids) == result.dim
         for i, grid in enumerate(result_grids):
             assert np.allclose(grid.shape, result.grid_shape)
             assert np.allclose(grid.flatten(), result.data[:, i])
 
+    def test_reshape_as_grid_mask_applied(self, sample_data):
+        data, grid_shape = sample_data
+        data.mask[:10, -1] = True
+        result = sampler.Sample(data, grid_shape)
+        result_grids = result.reshape_as_grid(True)
+        assert isinstance(result_grids, tuple)
+        for i, grid in enumerate(result_grids):
+            if i == data.shape[1] - 1:
+                assert np.isnan(grid.ravel()[:10]).all()
+            else:
+                assert np.isfinite(grid).all()
+
     def test_reshape_as_grid_no_shape_raises_error(self, sample_data):
         data, _ = sample_data
         result = sampler.Sample(data, None)
         with pytest.raises(AssertionError):
-            result.reshape_as_grid()
+            result.reshape_as_grid(False)
 
 
 class TestSample2d:
@@ -64,7 +80,7 @@ class TestSample2d:
         x = np.linspace(0, 1, 10)
         y = univariate_func(x)
         result = sampler.Sample2d(x, y, 10)
-        result_grid = result.reshape_as_grid()
+        result_grid = result.reshape_as_grid(True)
         assert np.allclose(result_grid[0], x)
         assert np.allclose(result_grid[1], y)
 

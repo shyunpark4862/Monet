@@ -28,6 +28,7 @@ from textwrap import indent
 from typing import Callable
 
 import numpy as np
+import numpy.ma as ma
 import pandas as pd
 
 """ SAMPLE CONTAINERS """
@@ -53,7 +54,7 @@ class Sample:
     
     Parameters
     ----------
-    data : np.ndarray of shape (n_samples, dim)
+    data : ma.MaskedArray of shape (n_samples, dim)
         The actual sample data. Each row is a sample, and each column is a
         dimension.
     grid_shape : np.ndarray or None
@@ -79,7 +80,7 @@ class Sample:
 
     def __init__(
             self,
-            data: np.ndarray,
+            data: ma.MaskedArray,
             grid_shape: np.ndarray | None
     ):
         self.data = data
@@ -93,33 +94,35 @@ class Sample:
     ) -> None:
         """
         Sets specific data points to NaN using a given boolean mask.
-        
+
         Parameters
         ----------
         mask : np.ndarray of shape (n_samples,)
             A boolean array. Data points at locations where the mask is **True**
-            will be set to NaN.
-
-        Warning
-        -------
-        This method permanently modifies the original data by setting masked 
-        values to NaN. The original values cannot be recovered after masking. If 
-        you need to preserve the original data, create a copy of the ``Sample``
-        object using the ``copy()`` method before applying the mask.
+            will be masked to NaN.
         """
-        self.data[mask, -1] = np.nan
+        self.data.mask[:, -1] = mask
 
-    def reshape_as_grid(self) -> tuple[np.ndarray, ...]:
+    def reshape_as_grid(
+            self,
+            apply_mask: bool
+    ) -> tuple[np.ndarray, ...]:
         """
         Reshapes the flat data array into a grid.
+
+        Parameters
+        ----------
+        apply_mask : bool
+            If True, masked values in the data array are filled with NaN values. 
+            If False, returns the raw underlying data array without applying any 
+            masking.
 
         Returns
         -------
         tuple[np.ndarray, ...]
-            A tuple of NumPy arrays, where each array represents a dimension
-            of the data reshaped as a grid. The return value contains ``dim`` 
-            number of reshaped np.ndarrays, each with size matching the
-            ``grid_shape``.
+            A tuple of np.arrays, where each array represents a dimension of the 
+            data reshaped as a grid. The return value contains ``dim`` number of 
+            reshaped np.ndarrays, each with size matching the ``grid_shape``.
 
         Raises
         ------
@@ -127,8 +130,9 @@ class Sample:
             If the ``grid_shape`` attribute is None.
         """
         assert self.grid_shape is not None, "Grid shape is not set."
+        data = self.data.data if not apply_mask else self.data.filled(np.nan)
         grids = [
-            self.data[:, i].reshape(self.grid_shape)
+            data[:, i].reshape(self.grid_shape)
             for i in range(self.dim)
         ]
         return *grids,
@@ -194,14 +198,42 @@ class Sample2d(Sample):
             grid_shape: int | None
     ):
         if grid_shape is None:
-            super().__init__(np.column_stack((x, y)), None)
+            super().__init__(ma.column_stack((x, y)), None)
         else:
-            super().__init__(np.column_stack((x, y)), np.atleast_1d(grid_shape))
+            super().__init__(ma.column_stack((x, y)), np.atleast_1d(grid_shape))
 
-    def reshape_as_grid(self) -> tuple[np.ndarray, np.ndarray]:
-        if self.grid_shape is None:
-            return self.data[:, 0], self.data[:, 1]
-        return *self.data.T,
+    def reshape_as_grid(
+            self, 
+            apply_mask: bool
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        A specialization of the parent class's ``reshape_as_grid()``.
+
+        Since univariate samples are inherently one-dimensional, no actual
+        reshaping is needed.
+
+        Parameters
+        ----------
+        apply_mask : bool
+            If True, masked values in the data array are filled with NaN values. 
+            If False, returns the raw underlying data array without applying any 
+            masking.
+
+        Returns
+        -------
+        np.ndarray of shape (n_samples,)
+            The x-coordinates of the sample points.
+        np.ndarray of shape (n_samples,)
+            The y-coordinates (function values) of the sample points.
+
+        Raises
+        ------
+        AssertionError
+            If the ``grid_shape`` attribute is None.
+        """
+        assert self.grid_shape is not None, "Grid shape is not set."
+        data = self.data.data if not apply_mask else self.data.filled(np.nan)
+        return *data.T,
 
 
 class Sample3d(Sample):
@@ -230,9 +262,9 @@ class Sample3d(Sample):
             grid_shape: tuple[int, int] | None
     ):
         if grid_shape is None:
-            super().__init__(np.column_stack((x, y, z)), None)
+            super().__init__(ma.column_stack((x, y, z)), None)
         else:
-            super().__init__(np.column_stack((x, y, z)), np.array(grid_shape))
+            super().__init__(ma.column_stack((x, y, z)), np.array(grid_shape))
 
 
 """ SAMPLING FUNCTIONS """
