@@ -2,19 +2,7 @@ import pytest
 import numpy as np
 
 import fplotter.sampler as sampler
-
-
-def univariate_func(x):
-    return np.sin(x)
-
-
-def bivariate_func(x, y):
-    return np.sin(x) * y + np.cos(y) * x
-
-
-def trivariate_func(x, y, z):
-    return np.sin(x) * y + np.cos(y) * z + np.tan(z) * x
-
+from test_functions import univariate_func, bivariate_func, trivariate_func
 
 @pytest.fixture
 def sample_data():

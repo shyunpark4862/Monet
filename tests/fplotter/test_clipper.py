@@ -38,8 +38,6 @@ class TestComputeFocusZone:
 # --- clip 함수 테스트 ---
 
 class TestClip:
-    """Tests for the main clip function."""
-
     def test_with_provided_bound(self, standard_sample):
         bound = (2.5, 10.0)
         # y = [0, 1, 2, 3, 4, 5, 100]

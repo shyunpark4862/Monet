@@ -3,14 +3,7 @@ import pytest
 
 from fplotter.sampler import Sample2d, Sample3d, Sample
 from fplotter.resampler import resample, _sort
-
-
-def univariate_func(x):
-    return np.sin(x)
-
-
-def bivariate_func(x, y):
-    return np.sin(x) * y + np.cos(y) * x
+from test_functions import univariate_func, bivariate_func
 
 
 @pytest.fixture
