@@ -25,9 +25,12 @@ SOFTWARE.
 from __future__ import annotations
 
 from textwrap import indent
+from typing import Callable
 
 import numpy as np
 import pandas as pd
+
+""" SAMPLE CONTAINERS """
 
 
 class Sample:
@@ -55,10 +58,10 @@ class Sample:
         dimension.
     grid_shape : np.ndarray or None
         If the data was sampled from a grid, this stores the shape of that grid.
-        e.g., ``(n,)`` for a 1D grid, ``(n, m)`` for a 2D grid. If sampling was
-        not done on a rectangular grid, this parameter should be None. For
-        n-dimensional samples, grid_shape should be an (n-1)-dimensional array,
-        and the product of its elements must equal ``n_samples``.
+        e.g., (n,) for a 1D grid, (n, m) for a 2D grid. If sampling was not done
+        on a rectangular grid, this parameter should be None. For n-dimensional
+        samples, grid_shape should be an (n-1)-dimensional array, and the
+        product of its elements must equal ``n_samples``.
 
     Attributes
     ----------
@@ -67,8 +70,8 @@ class Sample:
     dim : int
         The dimension of each sample (number of columns in ``data``).
         
-    Note
-    ____
+    Notes
+    -----
     Currently, the codomain of the sampled function f is assumed to be R. 
     However, this may be extended to higher dimensions in the future to support 
     parameterized curves.
@@ -118,11 +121,10 @@ class Sample:
             number of reshaped np.ndarrays, each with size matching the
             ``grid_shape``.
 
-        Warning
-        -------
-        This method requires the ``grid_shape`` attribute to be set (not None).
-        If the sample points were not generated from a rectangular grid, this
-        method will raise an assertion error.
+        Raises
+        ------
+        AssertionError
+            If the ``grid_shape`` attribute is None.
         """
         assert self.grid_shape is not None, "Grid shape is not set."
         grids = [
@@ -191,9 +193,14 @@ class Sample2d(Sample):
             y: np.ndarray,
             grid_shape: int | None
     ):
-        super().__init__(np.column_stack((x, y)), np.atleast_1d(grid_shape))
+        if grid_shape is None:
+            super().__init__(np.column_stack((x, y)), None)
+        else:
+            super().__init__(np.column_stack((x, y)), np.atleast_1d(grid_shape))
 
     def reshape_as_grid(self) -> tuple[np.ndarray, np.ndarray]:
+        if self.grid_shape is None:
+            return self.data[:, 0], self.data[:, 1]
         return *self.data.T,
 
 
@@ -211,7 +218,7 @@ class Sample3d(Sample):
         The z-coordinates of the sample points (values).
     grid_shape : tuple[int, int] or None
         If the data was sampled from a 2D grid, this stores the shape of that
-        grid, e.g., ``(n_x, n_y)``. See ``Sample.grid_shape`` parameter for more
+        grid, e.g., ``(nx, ny)``. See ``Sample.grid_shape`` parameter for more
         details.
     """
 
@@ -222,4 +229,113 @@ class Sample3d(Sample):
             z: np.ndarray,
             grid_shape: tuple[int, int] | None
     ):
-        super().__init__(np.column_stack((x, y, z)), np.array(grid_shape))
+        if grid_shape is None:
+            super().__init__(np.column_stack((x, y, z)), None)
+        else:
+            super().__init__(np.column_stack((x, y, z)), np.array(grid_shape))
+
+
+""" SAMPLING FUNCTIONS """
+
+
+def sample_uniform(
+        func: Callable[[np.ndarray], np.ndarray] |
+              Callable[[np.ndarray, np.ndarray], np.ndarray],
+        n_samples: int | tuple[int, int],
+        xbound: tuple[float, float],
+        ybound: tuple[float, float] | None = None,
+) -> Sample2d | Sample3d:
+    """
+    Samples a univariate or bivariate function at uniform intervals.
+
+    This is a factory function that samples either a univariate or bivariate
+    function depending on the provided arguments. It acts as a bivariate
+    function sampler if ``ybound`` is provided; otherwise, it samples a
+    univariate function.
+
+    Parameters
+    ----------
+    func : Callable
+        The univariate (y=f(x)) or bivariate (z=f(x,y)) function to sample.
+    n_samples : int or tuple[int, int]
+        For a univariate function, the number of samples (int). For a bivariate 
+        function, a tuple with the number of samples for each axis, (nx, ny).
+    xbound : tuple[float, float]
+        The range (start, end) of the x-axis to sample. The start value must be
+        less than the end value.
+    ybound : tuple[float, float] or None, optional (default: None)
+        The range (start, end) of the y-axis to sample, for bivariate functions.
+        The start value must be less than the end value. This parameter is 
+        required when sampling bivariate functions, otherwise the function will
+        be treated as univariate which may result in errors or unexpected 
+        behavior.
+
+    Returns
+    -------
+    Sample2d or Sample3d
+        Returns a ``Sample2d`` object for a univariate function, or a
+        ``Sample3d`` object for a bivariate function.
+    """
+    if ybound is None:
+        return _sample_uniform_univariate(func, n_samples, xbound)
+    else:
+        return _sample_uniform_bivariate(func, n_samples, xbound, ybound)
+
+
+def _sample_uniform_univariate(
+        func: Callable[[np.ndarray], np.ndarray],
+        n_samples: int,
+        xbound: tuple[float, float]
+) -> Sample2d:
+    """
+    Univariate helper function for ``sample_uniform``.
+
+    Parameters
+    ----------
+    func : Callable[[np.ndarray], np.ndarray]
+        The univariate function to sample (y = f(x)).
+    n_samples : int
+        The number of points to sample.
+    xbound : tuple[float, float]
+        The range (start, end) of the x-axis to sample.
+
+    Returns
+    -------
+    Sample2d
+        A ``Sample2d`` object containing the sampled (x, y) data.
+    """
+    x = np.linspace(*xbound, n_samples)
+    y = func(x)
+    return Sample2d(x, y, n_samples)
+
+
+def _sample_uniform_bivariate(
+        func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        n_samples: tuple[int, int],
+        xbound: tuple[float, float],
+        ybound: tuple[float, float]
+) -> Sample3d:
+    """
+    Bivariate helper function for ``sample_uniform``.
+
+    Parameters
+    ----------
+    func : Callable[[np.ndarray, np.ndarray], np.ndarray]
+        The bivariate function to sample (z = f(x, y)).
+    n_samples : tuple[int, int]
+        The number of points to sample on the x and y axes, (nx, ny).
+    xbound : tuple[float, float]
+        The range (start, end) of the x-axis to sample.
+    ybound : tuple[float, float]
+        The range (start, end) of the y-axis to sample.
+
+    Returns
+    -------
+    Sample3d
+        A ``Sample3d`` object containing the sampled (x, y, z) data.
+    """
+    x = np.linspace(*xbound, n_samples[0])
+    y = np.linspace(*ybound, n_samples[1])
+    X, Y = np.meshgrid(x, y, indexing="ij")
+    Z = func(X, Y)
+    return Sample3d(X.ravel(), Y.ravel(), Z.ravel(), n_samples)

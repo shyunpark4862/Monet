@@ -338,8 +338,8 @@ class Plotter:
         label : bool, optional (default: True)
             Whether to label the contour lines.
 
-        Note
-        ----
+        Notes
+        -----
         Future versions may implement automatic resampling to a uniform grid 
         when appropriate, allowing the use of the more efficient
         ``plt.imshow()`` method.
@@ -403,8 +403,8 @@ class Plotter:
             format from the ``file_name`` extension. If both are None, defaults
             to PNG format.
 
-        Note
-        ----
+        Notes
+        -----
         Unlike ``show()``, this method never flushes the figure buffer, ensuring 
         that multiple calls to ``save()`` will produce identical output files as 
         long as the figure content remains unchanged. However, this also means 
@@ -512,8 +512,8 @@ class Plotter:
         yscale : {"linear", "log", "symlog"}, optional (default: "linear")
             The scale for the y-axis (e.g., "linear", "log").
 
-        Note
-        ----
+        Notes
+        -----
         There is a known technical issue where minor ticks are not displayed
         when using "symlog" (symmetric log) scale. This is a limitation of the
         underlying matplotlib implementation.
@@ -538,8 +538,8 @@ class Plotter:
             The limits for the y-axis.
         
         
-        Developer Note
-        -------------
+        Notes
+        -----
         Matplotlib's 3D stuff is a real pain... It has
         ``mpl_toolkits.mplot3d.axes3d.Axes3D.set_zlim()`` but guess what? It 
         doesn't even properly clip the surface! Points outside the limits still 

@@ -87,7 +87,7 @@ def resample_bivariate(
 
 
 if __name__ == '__main__':
-    from sampler import sample_random_univariate, sample_uniform_bivariate, \
+    from sampler import sample_random_univariate, _sample_uniform_bivariate, \
         sample_random_bivariate
 
     sample = sample_random_bivariate(lambda x, y: np.sin(x) * np.cos(y), (0, 1),

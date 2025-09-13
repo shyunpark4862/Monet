@@ -1,1 +1,1 @@
-from .sample import Sample, Sample2d, Sample3d
+from .sample import Sample, Sample2d, Sample3d, sample_uniform

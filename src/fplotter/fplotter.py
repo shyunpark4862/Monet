@@ -3,8 +3,7 @@ from collections.abc import Callable
 import numpy as np
 
 from src.plotter.plotter import Plotter
-from sample import Sample3d
-from sampler import sample_uniform_univariate, sample_uniform_bivariate
+from sample import Sample2d, Sample3d, sample_uniform
 from clipper import clip_univariate, clip_bivariate
 from resampler import resample_bivariate, resample_univariate
 from refiner import refine_bivariate, refine_univariate
@@ -32,7 +31,7 @@ class FunctionPlotter(Plotter):
             amr_threshold: float = 0.1745,
             **kwargs
     ) -> None:
-        sample = sample_uniform_univariate(func, xbound, n_samples)
+        sample = sample_uniform(func, n_samples, xbound)
         if auto_clip or ybound is not None:
             clipped, ylimit = clip_univariate(sample, ybound, clip_coefficient)
         if adaptive_refine:
@@ -60,7 +59,7 @@ class FunctionPlotter(Plotter):
             amr_threshold: float = 0.1745,
             **kwargs
     ):
-        sample = sample_uniform_bivariate(func, xbound, ybound, n_samples)
+        sample = sample_uniform(func, n_samples, xbound, ybound)
         if auto_clip or zbound is not None:
             clipped, zlimit = clip_bivariate(sample, zbound, clip_coefficient)
         if adaptive_refine:
@@ -90,7 +89,7 @@ class FunctionPlotter(Plotter):
             amr_threshold: float = 0.1745,
             **kwargs
     ):
-        sample = sample_uniform_bivariate(func, xbound, ybound, n_samples)
+        sample = sample_uniform(func, n_samples, xbound, ybound)
         if auto_clip or zbound is not None:
             clipped, zlimit = clip_bivariate(sample, zbound, clip_coefficient)
         if adaptive_refine:
