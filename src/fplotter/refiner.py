@@ -81,6 +81,7 @@ class _MeshElement(ABC):
         self.neighbors = neighbors
         self.normal: np.ndarray | None = None
         self.area: float | None = None
+        self.mask: bool = False
 
         self.compute_area()
 
@@ -335,6 +336,13 @@ def refine(
     ``scipy.spatial.Delaunay`` which only supports full rebuilds. The adaptive
     library (https://github.com/python-adaptive/adaptive) demonstrates this
     approach.
+
+    Additionally, mesh elements that are completely masked by the clipper do not 
+    require further refinement. By tracking the mask status of mesh elements 
+    (where a mesh is considered masked if all its vertices are masked) and 
+    skipping refinement for masked elements, unnecessary computations can be 
+    avoided. This requires properly maintaining mask information as new sample 
+    points are added during refinement.
     """
     data = sample.data.data
     if sample.dim == 2:
@@ -465,11 +473,6 @@ def _compute_total_area(data: np.ndarray) -> float:
     """
     Computes the total area of the sampling region.
 
-    This function calculates the total area of the rectangular region where
-    the bivariate function is sampled. The area is determined by the bounds
-    of the sampling points in both x and y dimensions. The input data is
-    expected to contain the boundary points defining the sampling region.
-
     Parameters
     ----------
     data : numpy.ndarray of shape (n_samples, 3)
@@ -486,7 +489,8 @@ def _compute_total_area(data: np.ndarray) -> float:
 
 def _build_intervals(
         data: np.ndarray,
-        compute_normal: bool
+        compute_normal: bool,
+        mask: np.ndarray | None = None
 ) -> list[_Interval]:
     """
     Constructs a list of Interval objects from 1D point data.
@@ -520,14 +524,15 @@ def _build_triangles(
         data: np.ndarray,
         compute_normal: bool,
         delaunay: Delaunay | None,
-        n_new_samples: int
+        n_new_samples: int,
+        mask: np.ndarray | None = None
 ) -> tuple[list[_Triangle], Delaunay]:
     """
     Constructs a list of Triangle objects using Delaunay triangulation.
 
     This function uses ``scipy.spatial.Delaunay`` to perform the triangulation.
     While there are various algorithms for Delaunay triangulation (e.g.,
-    Bowyer-Watson, Fortune's sweep), scipy.spatial.Delaunay uses Qhull. The
+    Bowyer-Watson, Fortune's sweep), ``scipy.spatial.Delaunay`` uses Qhull. The
     algorithm works by lifting the 2D points onto a 3D paraboloid, computing
     their convex hull, and projecting the lower hull faces back onto the 2D
     plane to obtain the Delaunay triangulation. For details, see:
@@ -695,7 +700,7 @@ def _refine_mesh(
     """
     coords = []
     for mesh in meshes:
-        if mesh.area > total_area * eps and mesh.max_badness() > theta:
+        if not mesh.mask and mesh.area > total_area * eps and mesh.max_badness() > theta:
             coords.append(mesh.midpoints())
     if not coords:
         return data, 0
