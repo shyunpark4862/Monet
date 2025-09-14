@@ -2,7 +2,7 @@
 
 ## Gamma Related Functions
 
-### Gamma Function
+### Gamma Function (`sp.gamma`)
 
 The gamma function is defined as follows for $\mathfrak{R}(z)>0$, and is defined by analytic continuation elsewhere.
 
@@ -13,7 +13,7 @@ $$
 The gamma function has poles at non-negative integers. In Python, it is
 calculated using `sp.gamma` and supports calculations for $z\in\mathbb{C}$ (returns NaN for non-negative integers)
 
-### Beta Function
+### Beta Function (`sp.beta`)
 
 The beta function is defined as follows for $x,\,y\in\mathbb{R}^+$, and is defined by analytic continuation elsewhere.
 
@@ -23,7 +23,7 @@ $$
 
 The beta function has poles when either $x$ or $y$ is a non-negative integer. In Python, it is calculated using `sp.beta` and supports calculations for $x,\,y\in\mathbb{R}$ (does not support complex $x,\,y$, and returns $\pm\infty$ when either $x$ or $y$ is a non-negative integer)
 
-### Polygamma Function
+### Polygamma Function (`sp.polygamma`, `sp.psi`, `sp.digamma`)
 
 The polygamma function is defined as the logarithmic derivative of the gamma function.
 
@@ -35,7 +35,7 @@ When $n=0$, the polygamma function is also called the psi function or digamma fu
 
 ## Error Functions
 
-### Error Function
+### Error Function (`sp.erf`)
 
 The error function is defined as follows for all $z\in\mathbb{C}$.
 
@@ -46,7 +46,7 @@ $$
 For $x\in\mathbb{R}$, the error function has asymptotes at $\pm1$ and is
 analytic for all $z\in\mathbb{C}$. In Python, it is calculated using `sp.erf` and supports calculations for $z\in\mathbb{C}$.
 
-### Fresnel Integral
+### Fresnel Integral (`sp.fresnel`)
 
 The Fresnel integral functions are defined as follows for all $z\in\mathbb{C}$.
 
