@@ -48,7 +48,9 @@ def clip(
         empty.
     bound : tuple[float, float] or None
         The (lower, upper) boundary for filtering the data. If this value is
-        None, the boundary is calculated automatically. When provided, the first
+        None, the boundary is calculated automatically using the focus zone 
+        calculation. When provided, the automatic focus zone calculation is 
+        skipped and the mask is generated directly using these bounds. The first
         element must be smaller than the second element.
     k : float
         The IQR coefficient used when automatically calculating boundaries if

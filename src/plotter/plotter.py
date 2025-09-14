@@ -206,8 +206,7 @@ class Plotter:
                 "solid", "dashed", "dashdot", "dotted"
             ] = "solid",
             colorbar: bool = True,
-            label: bool = True,
-            zorder: int | None = None
+            label: bool = True
     ) -> None:
         """
         Creates a contour plot.

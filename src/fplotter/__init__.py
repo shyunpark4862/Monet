@@ -1,3 +1,3 @@
-from .fplotter import FunctionPlotter
+from .fplotter import FPlotter
 
-__all__ = ["FunctionPlotter"]
+__all__ = ["FPlotter"]
