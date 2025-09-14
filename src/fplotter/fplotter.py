@@ -100,6 +100,41 @@ class FPlotter(Plotter):
         if ybound is not None:
             super().axis_limit(ylimit=ybound)
 
+    # TODO: documentation
+    def flines(
+            self,
+            funcs: list[Callable[[np.ndarray], np.ndarray]],
+            xbound: tuple[float, float],
+            n_samples: int = 100,
+            ybound: tuple[float, float] | None = None,
+            auto_clip: bool = True,
+            k: float = 1.5,
+            n_iters: int = 3,
+            theta: float = 0.1745,
+            **kwargs
+    ):
+        samples = []
+        for func in funcs:
+            samples.append(sampler.sample(func, n_samples, xbound))
+        if auto_clip or ybound is not None:
+            data_merged = np.vstack([sample.data.data for sample in samples])
+            sample_merged = sampler.Sample2d(*data_merged.T, None)
+            _, ybound = clipper.clip(sample_merged, ybound, k)
+        if n_iters > 0:
+            contour_levels = None if ybound is None \
+                else np.array(ybound)
+            for i, func in enumerate(funcs):
+                sample = refiner.refine(
+                    func, samples[i], contour_levels, False, theta, n_iters
+                )
+                samples[i] = resampler.resample(sample)
+        for sample in samples:
+            mask, _ = clipper.clip(sample, ybound, k)
+            sample.set_mask(mask)
+            super().line(*sample.reshape_as_grid(True), **kwargs)
+        if ybound is not None:
+            super().axis_limit(ylimit=ybound)
+
     def fcontour(
             self,
             func: Callable[[np.ndarray, np.ndarray], np.ndarray],

@@ -107,9 +107,8 @@ def _compute_focus_zone(
     Returns
     -------
     tuple[float, float] or None
-        A tuple containing the (lower, upper) of the calculated focus zone.
-        Returns None if all data is NaN or the IQR is close to zero, making it
-        impossible to calculate a valid range.
+        A tuple of (lower, upper) bounds of the calculated focus zone. None if
+        the data contains all NaN, has near-zero IQR, or has no outliers.
 
     """
     if np.isnan(value).all():
@@ -118,4 +117,8 @@ def _compute_focus_zone(
     iqr = q3 - q1
     if np.isclose(k * iqr, 0, atol=1e-6):
         return None
-    return q1 - k * iqr, q3 + k * iqr
+    low, high = q1 - k * iqr, q3 + k * iqr
+    if low < np.nanmin(value) and high > np.nanmax(value):
+        return None
+    else:
+        return low, high
