@@ -28,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.interpolate import griddata
 
-from .sampler import Sample2d, Sample3d, Sample
+from .sampler import Sample, Sample2d, Sample3d
 
 
 def resample(

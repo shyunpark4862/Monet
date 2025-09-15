@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TypeVar, Final
+from typing import Final, TypeVar
 
 import numpy as np
 import numpy.typing as npt

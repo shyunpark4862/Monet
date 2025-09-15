@@ -31,6 +31,7 @@ from typing import Literal
 import matplotlib.pyplot as plt
 
 from .types import Color, LineStyle
+from .validator import validate
 
 
 def _apply_style(method):
@@ -86,7 +87,7 @@ class Plotter:
         The width and height of the figure in inches.
     dpi : int, optional (default: 300)
         The resolution of the figure in dots per inch.
-    style : str, optional (default: "scientific.mplstyle")
+    style : Path, optional (default: "scientific.mplstyle")
         The path to the matplotlib style file to be used for plotting. Style 
         files (``*.mplstyle``) located in src/plotter/styles/ directory, and 
         users can add their own style files to this directory for immediate use. 
@@ -105,7 +106,8 @@ class Plotter:
             self,
             figure_size: tuple[float, float] = (4.6, 3.45),
             dpi: int = 300,
-            style: str = files("plotter") / "styles" / "scientific.mplstyle"
+            style: Path | str = files(
+                "plotter") / "styles" / "scientific.mplstyle"
     ):
         self.figure_size = figure_size
         self.dpi = dpi
@@ -118,6 +120,11 @@ class Plotter:
     """ Public Methods """
 
     @_apply_style
+    @validate(
+        "data2d", "alpha", "linecolor", "linewidth", "linestyle",
+        "marker", "markersize", "markeredgecolor", "markeredgewidth",
+        "markerfacecolor", "zorder", "legend"
+    )
     def line(
             self,
             x: Iterable[float],
@@ -136,7 +143,7 @@ class Plotter:
     ) -> None:
         """
         Plots a line.
-        
+
         Parameters
         ----------
         x : Iterable[float]
@@ -144,13 +151,13 @@ class Plotter:
         y : Iterable[float]
             The y-coordinates of the data points.
         alpha : float, optional (default: 1)
-            The transparency of all plot elements (line, marker face, marker 
+            The transparency of all plot elements (line, marker face, marker
             edge). Value ranges from 0 (completely transparent) to 1 (completely
             opaque). Cannot be set independently for different elements.
         linecolor : Color or None, optional (default: None)
-            The color of the line. Can be a color name as a string (e.g. "red"), 
-            RGB values as a tuple of floats between 0 and 1, or a hex RGB color 
-            code (e.g. "#FF0000"). Transparency should be set via the ``alpha`` 
+            The color of the line. Can be a color name as a string (e.g. "red"),
+            RGB values as a tuple of floats between 0 and 1, or a hex RGB color
+            code (e.g. "#FF0000"). Transparency should be set via the ``alpha``
             parameter, not as a fourth tuple value.
         linewidth : float, optional (default: 1)
             The width of the line.
@@ -162,16 +169,16 @@ class Plotter:
         markersize : float, optional (default: 5)
             The size of the markers.
         markeredgecolor : Color or None, optional (default: None)
-            The color of the marker edges. Can be a color name as a string  
-            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
-            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            The color of the marker edges. Can be a color name as a string
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via
             the ``alpha`` parameter, not as a fourth tuple value.
         markeredgewidth : float, optional (default: 0)
             The width of the marker edges.
         markerfacecolor : Color or None, optional (default: None)
-            The color of the marker face. Can be a color name as a string  
-            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
-            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            The color of the marker face. Can be a color name as a string
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via
             the ``alpha`` parameter, not as a fourth tuple value.
         zorder : int or None, optional (default: None)
             The z-order for plotting. Higher values appear in front of elements
@@ -184,11 +191,16 @@ class Plotter:
         self.axes.plot(
             x, y, alpha=alpha, color=linecolor, linewidth=linewidth,
             linestyle=linestyle, marker=marker, markersize=markersize,
-            markeredgecolor=markeredgecolor, markeredgewidth=markeredgewidth,
+            markeredgecolor=markeredgecolor,
+            markeredgewidth=markeredgewidth,
             markerfacecolor=markerfacecolor, zorder=zorder, label=legend
         )
 
     @_apply_style
+    @validate(
+        "data3d", "levels", "alpha", "colormap", "linecolor", "linewidth",
+        "colorbar", "label"
+    )
     def contour(
             self,
             X: Iterable[float],
@@ -196,7 +208,7 @@ class Plotter:
             Z: Iterable[float],
             levels: int | Iterable[float] = 10,
             alpha: float = 1,
-            color_map: str = "viridis",
+            colormap: str = "viridis",
             linecolor: Color | None = None,
             linewidth: float = 1,
             linestyle: LineStyle = "solid",
@@ -238,7 +250,7 @@ class Plotter:
             contours.
         alpha : float, optional (default: 1)
             The transparency of the contour lines.
-        color_map : str, optional (default: "viridis")
+        colormap : str, optional (default: "viridis")
             The colormap for the contour lines. Ignored if ``linecolor`` is
             provided.
         linecolor : Color or None, optional (default: None)
@@ -246,7 +258,7 @@ class Plotter:
             (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
             hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
             the ``alpha`` parameter, not as a fourth tuple value. When provided, 
-            overrides ``color_map``.
+            overrides ``colormap``.
         linewidth : float, optional (default: 1)
             The width of the contour lines.
         linestyle : {"solid", "dashed", "dashdot", "dotted"}, optional
@@ -257,19 +269,19 @@ class Plotter:
         label : bool, optional (default: True)
             Whether to label the contour lines.
         """
-        color_map = color_map if linecolor is None else None
+        colormap = colormap if linecolor is None else None
         contour_set = self.axes.contour(
             X, Y, Z, levels=levels, colors=linecolor, alpha=alpha,
-            cmap=color_map, linewidths=linewidth, linestyles=linestyle
+            cmap=colormap, linewidths=linewidth, linestyles=linestyle
         )
         if label:
             plt.clabel(contour_set, inline_spacing=20)
-        if colorbar and not (color_map is None and linecolor is not None):
+        if colorbar and not (colormap is None and linecolor is not None):
             # Create filled contour plot for smooth colorbar
             _, ax = plt.subplots()
             tmp = ax.contourf(
                 X, Y, Z, vmin=min(contour_set.levels),
-                vmax=max(contour_set.levels), levels=50, cmap=color_map
+                vmax=max(contour_set.levels), levels=50, cmap=colormap
             )
             plt.colorbar(
                 tmp, ax=self.axes, ticks=contour_set.levels,
@@ -277,17 +289,21 @@ class Plotter:
             )
 
     @_apply_style
+    @validate(
+        "data3d", "alpha", "colormap", "contour", "levels", "linecolor",
+        "linewidth", "colorbar", "label"
+    )
     def heatmap(
             self,
             X: Iterable[float],
             Y: Iterable[float],
             Z: Iterable[float],
             alpha: float = 1,
-            color_map: str = "viridis",
+            colormap: str = "viridis",
             contour: bool = True,
-            levels: int | Iterable[float] | None = None,
+            levels: int | Iterable[float] = 7,
             linecolor: Color = "white",
-            linewidth: float | None = 0.75,
+            linewidth: float = 0.75,
             linestyle: LineStyle = "solid",
             colorbar: bool = True,
             label: bool = True
@@ -310,11 +326,11 @@ class Plotter:
             The values for the heatmap.
         alpha : float, optional (default: 1)
             The transparency of the heatmap.
-        color_map : str, optional (default: "viridis")
+        colormap : str, optional (default: "viridis")
             The colormap for the heatmap.
         contour : bool, optional (default: True)
             Whether to overlay contour lines.
-        levels : int or Iterable[float] or None, optional (default: None)
+        levels : int or Iterable of floats, optional (default: 7)
             The number of contour levels or specific levels.
         linecolor : Color, optional (default: "white")
             The color of the contour lines. Can be a color name as string 
@@ -338,7 +354,7 @@ class Plotter:
         ``plt.imshow()`` method.
         """
         contour_fill = self.axes.contourf(
-            X, Y, Z, levels=100, alpha=alpha, cmap=color_map
+            X, Y, Z, levels=100, alpha=alpha, cmap=colormap
         )
         if contour:
             contour_set = self.axes.contour(
@@ -377,7 +393,7 @@ class Plotter:
             self,
             filename: str | Path,
             transparent: bool = True,
-            dpi: int | Literal["figure"] = "figure",
+            dpi: int | None = None,
             format_: str | None = None,
     ) -> None:
         """
@@ -389,8 +405,8 @@ class Plotter:
             The name of the file to save.
         transparent : bool, optional (default: True)
             Whether to save the figure with a transparent background.
-        dpi : int or {"figure"}, optional (default: "figure")
-            The resolution for saving the figure. If "figure", uses the same dpi
+        dpi : int or None, optional (default: None)
+            The resolution for saving the figure. If None, uses the same dpi
             value as the created figure.
         format_ : str or None, optional (default: None)
             The file format. If provided, uses this format. If None, infers the
@@ -406,6 +422,7 @@ class Plotter:
         ``save()`` can lead to overlapping or corrupted plots. Unless there is 
         a specific reason not to, always call ``clear()`` after ``save()``.
         """
+        dpi = self.dpi if dpi is None else dpi
         self.figure.savefig(
             Path(filename), transparent=transparent, dpi=dpi, format=format_
         )
@@ -518,8 +535,8 @@ class Plotter:
     @_apply_style
     def axis_limit(
             self,
-            xlimit: tuple[float, float] = None,
-            ylimit: tuple[float, float] = None
+            xlimit: tuple[float, float] | None = None,
+            ylimit: tuple[float, float] | None = None
     ) -> None:
         """
         Sets the limits for the x and y axes.

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from importlib.resources import files
 
 import numpy as np
@@ -8,8 +8,8 @@ from plotter import Plotter
 from .clipper import clip
 from .refiner import refine
 from .resampler import resample
-from .sampler import Sample, Sample2d, Sample3d, sample_uniform
-from .types import Univariate, Bivariate, Function
+from .sampler import Sample, Sample3d, sample_uniform
+from .types import Bivariate, Function, Univariate
 
 
 class FPlotter(Plotter):

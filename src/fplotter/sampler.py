@@ -31,7 +31,7 @@ import numpy.ma as ma
 import numpy.typing as npt
 import pandas as pd
 
-from .types import Univariate, Bivariate, Function
+from .types import Bivariate, Function, Univariate
 
 """ SAMPLE CONTAINERS """
 
