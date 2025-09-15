@@ -25,11 +25,13 @@ SOFTWARE.
 from __future__ import annotations
 
 from textwrap import indent
-from typing import Callable
 
 import numpy as np
 import numpy.ma as ma
+import numpy.typing as npt
 import pandas as pd
+
+from .types import Univariate, Bivariate, Function
 
 """ SAMPLE CONTAINERS """
 
@@ -57,7 +59,7 @@ class Sample:
     data : ma.MaskedArray of shape (n_samples, dim)
         The actual sample data. Each row is a sample, and each column is a
         dimension.
-    grid_shape : np.ndarray or None
+    grid_shape : ndarray of shape (dim,) or None
         If the data was sampled from a grid, this stores the shape of that grid.
         e.g., (n,) for a 1D grid, (n, m) for a 2D grid. If sampling was not done
         on a rectangular grid, this parameter should be None. For n-dimensional
@@ -81,7 +83,7 @@ class Sample:
     def __init__(
             self,
             data: ma.MaskedArray,
-            grid_shape: np.ndarray | None
+            grid_shape: npt.NDArray[float] | None
     ):
         self.data = data
         self.n_samples: int = data.shape[0]
@@ -90,14 +92,14 @@ class Sample:
 
     def set_mask(
             self,
-            mask: np.ndarray
+            mask: npt.NDArray[bool]
     ) -> None:
         """
         Sets specific data points to NaN using a given boolean mask.
 
         Parameters
         ----------
-        mask : np.ndarray of shape (n_samples,)
+        mask : ndarray of shape (n_samples,)
             A boolean array. Data points at locations where the mask is **True**
             will be masked to NaN.
         """
@@ -106,7 +108,7 @@ class Sample:
     def reshape_as_grid(
             self,
             apply_mask: bool
-    ) -> tuple[np.ndarray, ...]:
+    ) -> tuple[npt.NDArray[float], ...]:
         """
         Reshapes the flat data array into a grid.
 
@@ -119,10 +121,10 @@ class Sample:
 
         Returns
         -------
-        tuple[np.ndarray, ...]
-            A tuple of np.arrays, where each array represents a dimension of the 
-            data reshaped as a grid. The return value contains ``dim`` number of 
-            reshaped np.ndarrays, each with size matching the ``grid_shape``.
+        tuple of ndarrays
+            A tuple of ndarrays, where each array represents a dimension of the
+            data reshaped as a grid. The return value contains a ``dim`` number
+            of reshaped ndarrays, each with size matching the ``grid_shape``.
 
         Raises
         ------
@@ -182,30 +184,28 @@ class Sample2d(Sample):
     
     Parameters
     ----------
-    x : np.ndarray
+    x : ndarray
         The x-coordinates of the sample points.
-    y : np.ndarray
+    y : ndarray
         The y-coordinates of the sample points (values).
     grid_shape : int or None
         For 1D grids, this is equal to the length of ``x``. See
-        ``Sample.grid_shape`` parameter for more details.
+         the `` Sample.grid_shape `` parameter for more details.
     """
 
     def __init__(
             self,
-            x: np.ndarray,
-            y: np.ndarray,
+            x: npt.NDArray[float],
+            y: npt.NDArray[float],
             grid_shape: int | None
     ):
-        if grid_shape is None:
-            super().__init__(ma.column_stack((x, y)), None)
-        else:
-            super().__init__(ma.column_stack((x, y)), np.atleast_1d(grid_shape))
+        grid_shape = np.array([grid_shape]) if grid_shape is not None else None
+        super().__init__(ma.column_stack((x, y)), grid_shape)
 
     def reshape_as_grid(
-            self, 
+            self,
             apply_mask: bool
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[npt.NDArray[float], npt.NDArray[float]]:
         """
         A specialization of the parent class's ``reshape_as_grid()``.
 
@@ -221,9 +221,9 @@ class Sample2d(Sample):
 
         Returns
         -------
-        np.ndarray of shape (n_samples,)
+        ndarray of shape (n_samples,)
             The x-coordinates of the sample points.
-        np.ndarray of shape (n_samples,)
+        ndarray of shape (n_samples,)
             The y-coordinates (function values) of the sample points.
 
         Raises
@@ -242,23 +242,22 @@ class Sample3d(Sample):
 
     Parameters
     ----------
-    x : np.ndarray
+    x : ndarray
         The x-coordinates of the sample points.
-    y : np.ndarray
+    y : ndarray
         The y-coordinates of the sample points.
-    z : np.ndarray
+    z : ndarray
         The z-coordinates of the sample points (values).
-    grid_shape : tuple[int, int] or None
+    grid_shape : (int, int) or None
         If the data was sampled from a 2D grid, this stores the shape of that
-        grid, e.g., ``(nx, ny)``. See ``Sample.grid_shape`` parameter for more
-        details.
+        grid, e.g., (nx, ny). See ``Sample.grid_shape`` for more details.
     """
 
     def __init__(
             self,
-            x: np.ndarray,
-            y: np.ndarray,
-            z: np.ndarray,
+            x: npt.NDArray[float],
+            y: npt.NDArray[float],
+            z: npt.NDArray[float],
             grid_shape: tuple[int, int] | None
     ):
         if grid_shape is None:
@@ -270,13 +269,12 @@ class Sample3d(Sample):
 """ SAMPLING FUNCTIONS """
 
 
-def sample(
-        func: Callable[[np.ndarray], np.ndarray] |
-              Callable[[np.ndarray, np.ndarray], np.ndarray],
+def sample_uniform(
+        func: Function[float],
         n_samples: int | tuple[int, int],
         xbound: tuple[float, float],
         ybound: tuple[float, float] | None = None,
-) -> Sample2d | Sample3d:
+) -> Sample:
     """
     Samples a univariate or bivariate function at uniform intervals.
 
@@ -287,7 +285,7 @@ def sample(
 
     Parameters
     ----------
-    func : Callable
+    func : Function of float
         The univariate (y=f(x)) or bivariate (z=f(x,y)) function to sample.
     n_samples : int or tuple[int, int]
         For a univariate ``func``, the number of samples (int). For a bivariate 
@@ -301,13 +299,13 @@ def sample(
     ybound : tuple[float, float] or None, optional (default: None)
         The range (start, end) of the y-axis to sample, for bivariate functions.
         The start value must be less than the end value. This parameter is 
-        required when sampling bivariate ``func``, otherwise the ``func`` will
+        required when sampling bivariate ``func``; otherwise the ``func`` will
         be treated as univariate which may result in errors or unexpected 
         behavior.
 
     Returns
     -------
-    Sample2d or Sample3d
+    Sample
         Returns a ``Sample2d`` object for a univariate function, or a
         ``Sample3d`` object for a bivariate function.
     """
@@ -320,7 +318,7 @@ def sample(
 
 
 def _sample_univariate(
-        func: Callable[[np.ndarray], np.ndarray],
+        func: Univariate[float],
         n_samples: int,
         xbound: tuple[float, float]
 ) -> Sample2d:
@@ -329,11 +327,11 @@ def _sample_univariate(
 
     Parameters
     ----------
-    func : Callable[[np.ndarray], np.ndarray]
+    func : Univariate of float
         The univariate function to sample (y = f(x)).
     n_samples : int
         The number of points to sample.
-    xbound : tuple[float, float]
+    xbound : (float, float)
         The range (start, end) of the x-axis to sample.
 
     Returns
@@ -347,7 +345,7 @@ def _sample_univariate(
 
 
 def _sample_bivariate(
-        func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        func: Bivariate[float],
         n_samples: tuple[int, int],
         xbound: tuple[float, float],
         ybound: tuple[float, float]
@@ -357,13 +355,13 @@ def _sample_bivariate(
 
     Parameters
     ----------
-    func : Callable[[np.ndarray, np.ndarray], np.ndarray]
+    func : Bivariate of float
         The bivariate function to sample (z = f(x, y)).
-    n_samples : tuple[int, int]
+    n_samples : (int, int)
         The number of points to sample on the x and y axes, (nx, ny).
-    xbound : tuple[float, float]
+    xbound : (float, float)
         The range (start, end) of the x-axis to sample.
-    ybound : tuple[float, float]
+    ybound : (float, float)
         The range (start, end) of the y-axis to sample.
 
     Returns

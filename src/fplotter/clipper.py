@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import numpy as np
+import numpy.typing as npt
 
 from . import sampler
 
@@ -31,7 +32,7 @@ def clip(
         sample: sampler.Sample,
         bound: tuple[float, float] | None,
         k: float
-) -> tuple[np.ndarray, tuple[float, float] | None]:
+) -> tuple[npt.NDArray[float], tuple[float, float] | None]:
     """
     Creates a mask to identify data points that fall outside a given boundary.
 
@@ -46,7 +47,7 @@ def clip(
         A ``sampler.Sample`` object containing the data points. The mask is
         generated based on the data in the last column. The sample must not be
         empty.
-    bound : tuple[float, float] or None
+    bound : (float, float) or None
         The (lower, upper) boundary for filtering the data. If this value is
         None, the boundary is calculated automatically using the focus zone 
         calculation. When provided, the automatic focus zone calculation is 
@@ -58,10 +59,10 @@ def clip(
 
     Returns
     -------
-    np.ndarray
+    ndarray of shape (n_samples,)
         A boolean mask array. Values outside the boundary are marked as True,
         and values inside are False.
-    tuple[float, float] or None
+    (float, float) or None
         The (lower, upper) boundary used for clipping. None if no valid
         boundary could be computed.
 
@@ -79,7 +80,7 @@ def clip(
 
 
 def _compute_focus_zone(
-        value: np.ndarray,
+        value: npt.NDArray[float],
         k: float
 ) -> tuple[float, float] | None:
     """
@@ -97,7 +98,7 @@ def _compute_focus_zone(
 
     Parameters
     ----------
-    value : np.ndarray of shape (n_samples,)
+    value : ndarray of shape (n_samples,)
         The 1D data array on which to perform the calculation. NaN values in
         the array are automatically ignored.
     k : float
@@ -106,7 +107,7 @@ def _compute_focus_zone(
 
     Returns
     -------
-    tuple[float, float] or None
+    (float, float) or None
         A tuple of (lower, upper) bounds of the calculated focus zone. None if
         the data contains all NaN, has near-zero IQR, or has no outliers.
 

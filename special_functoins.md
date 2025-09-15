@@ -60,3 +60,20 @@ $$
 For $x\in\mathbb{R}$, the Fresnel integral functions have asymptotes at $\pm1/2$ and are analytic for all $z\in\mathbb{C}$. In Python, they are calculated using `sp.fresnel`, which returns a tuple containing both $S(z)$ and $C(z)$ values for a given $z\in\mathbb{C}$.
 
 The parametrized curve using Fresnel integral functions as $x,\,y$ coordinates is known as an Euler spiral, Cornu spiral, or clothoid.
+
+## Orthogonal polynomials
+
+### Associated Laguerree Polynomials (`sp.assoc_laguerre`)
+
+The associated (generalized) Laguerre polynomial은 $n\in\mathbb{N},\,\alpha,\,x\in\mathbb{R}$에 대해 다음 미분방정식의 다항식 해로 정의되며, $k=0$인 경우를 특별히 Laguerre polynomial이라 한다.
+
+$$
+xy''+(\alpha+1-x)y'+ny=0
+$$
+
+associated Laguerre polynomials은 다음과 같은 닫힌 형식으로 표현할 수 있다.
+
+$$
+L^{(\alpha)}_n(x)=\sum_{i=0}^n(-1)^i\binom{n+k}{n-i}\frac{x^i}{i!}
+$$
+

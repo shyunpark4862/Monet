@@ -25,15 +25,13 @@ SOFTWARE.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import Final
 
 import numpy as np
+import numpy.typing as npt
 from scipy.spatial import Delaunay
 
-from .sampler import Sample2d, Sample3d
-
-FLT_EPS: Final[float] = np.finfo(float).eps  # Floating point epsilon
+from .types import FLT_EPS, Univariate, Bivariate, Function
+from .sampler import Sample2d, Sample3d, Sample
 
 """ CLASSES FOR MESH """
 
@@ -48,21 +46,20 @@ class _MeshElement(ABC):
 
     Parameters
     ----------
-    points : tuple[int, ...]
+    points : tuple of ints
         Indices of the vertices that form this mesh element, referencing the
         main data array.
-    data : np.ndarray
+    data : ndarray of shape (n_samples, dim)
         A reference to the full dataset array containing all sample points.
-    badness : list[float]
+    badness : list of floats
         A list storing the badness metric.
-    neighbors : list[_MeshElement]
+    neighbors : list of _MeshElements
         A list of neighboring mesh elements.
 
     Attributes
     ----------
-    normal : np.ndarray or None
+    normal : ndarray or shape (dim,) or None
         The normal vector of the element.
-
     area : float or None
         The area (2D) or length (1D) of the element.
     """
@@ -70,7 +67,7 @@ class _MeshElement(ABC):
     def __init__(
             self,
             points: tuple[int, ...],
-            data: np.ndarray,
+            data: npt.NDArray[float],
             badness: list[float],
             neighbors: list[_MeshElement]
     ):
@@ -79,7 +76,7 @@ class _MeshElement(ABC):
         self.data = data
         self.badness = badness
         self.neighbors = neighbors
-        self.normal: np.ndarray | None = None
+        self.normal: npt.NDArray[float] | None = None
         self.area: float | None = None
         self.mask: bool = False
 
@@ -90,21 +87,21 @@ class _MeshElement(ABC):
         pass
 
     @abstractmethod
-    def compute_area(self) -> float:
+    def compute_area(self) -> None:
         pass
 
     @abstractmethod
-    def midpoints(self) -> np.ndarray:
+    def midpoints(self) -> npt.NDArray[float]:
         pass
 
-    def vertices(self) -> np.ndarray:
+    def vertices(self) -> npt.NDArray[float]:
         """
         Returns the vertices of a mesh element as an array.
 
         Returns
         -------
-        numpy.ndarray
-            An array containing the vertices of the shape.
+        ndarray of shape (n_vertices, dim)
+            A ndarray containing the vertices of the shape.
         """
         return self.data[self.points, :]
 
@@ -153,7 +150,7 @@ class _Interval(_MeshElement):
     def __init__(
             self,
             points: tuple[int, int],
-            data: np.ndarray
+            data: npt.NDArray[float]
     ):
         super().__init__(points, data, np.repeat(np.nan, 3), [None] * 2)
 
@@ -162,8 +159,8 @@ class _Interval(_MeshElement):
         Computes and assigns the normal vector for a 2D interval (line segment).
 
         For a line segment from point ``x0 = (x0, y0)`` to ``x1 = (x1, y1)``, 
-        the normal vector ``n`` is computed as ``n = (y1 - y0, -(x1 - x0))``.
-        The resulting normal vector is then normalized to unit length and its 
+        the normal vector n is computed as n = (y1 - y0, -(x1 - x0)). The
+        resulting normal vector is then normalized to unit length, and its
         direction is adjusted to ensure the y-component is positive.
         """
         x0, x1 = self.vertices()
@@ -171,7 +168,7 @@ class _Interval(_MeshElement):
         n = _normalize(n)
         self.normal = n if n[-1] > 0 else -n
 
-    def compute_area(self) -> float:
+    def compute_area(self) -> None:
         """
         Computes the area (length) of an interval.
         """
@@ -199,7 +196,7 @@ class _Triangle(_MeshElement):
     def __init__(
             self,
             points: tuple[int, int, int],
-            data: np.ndarray
+            data: npt.NDArray[float]
     ):
         super().__init__(points, data, np.repeat(np.nan, 4), [None] * 3)
 
@@ -208,38 +205,36 @@ class _Triangle(_MeshElement):
         Computes and assigns the normal vector for a 3D triangle.
 
         This method calculates the normal vector of a triangle defined by its 
-        vertices. The normal is derived using the cross product of two edges of 
-        the triangle. The normal vector ``n`` is calculated using the formula 
-        ``n = (x2 - x0) × (x2 - x0)`` where ``x0``, ``x1``, ``x2`` are the 
-        vertices of the triangle. The resulting normal vector is then normalized 
-        to unit length and its direction is adjusted to ensure the z-component 
-        is positive.
+        vertices. The normal is derived using the cross-product of two edges of
+        the triangle. The normal vector n is calculated using the formula
+        ``n = (x2 - x0) × (x2 - x0)`` where x0, x1, x2 are the vertices of the
+        triangle. The resulting normal vector is then normalized to unit length,
+        and its direction is adjusted to ensure the z-component is positive.
         """
         x0, x1, x2 = self.vertices()
         n = np.cross(x1 - x0, x2 - x0)
         n = _normalize(n)
         self.normal = n if n[-1] > 0 else -n
 
-    def compute_area(self) -> float:
+    def compute_area(self) -> None:
         """
         Computes and assigns the area of a triangle.
 
         This method computes the area of a triangle using Shoelace formula. For
         more details, see:
-
         - Shoelace formula : https://en.wikipedia.org/wiki/Shoelace_formula.
         """
         (x0, y0), (x1, y1), (x2, y2) = self.vertices()[:, :-1]
         self.area = abs(x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1)) / 2
 
-    def midpoints(self) -> np.ndarray:
+    def midpoints(self) -> npt.NDArray[float]:
         """
         Computes midpoints of the edges of a triangle.
 
         Returns
         -------
-        np.ndarray of shape (3, 2)
-            A np.ndarray containing the midpoints of the edges. Each row
+        ndarray of shape (3, 2)
+            A ndarray containing the midpoints of the edges. Each row
             corresponds to a midpoint in the format (x, y).
         """
         (x0, y0), (x1, y1), (x2, y2) = self.vertices()[:, :-1]
@@ -248,20 +243,20 @@ class _Triangle(_MeshElement):
         return np.array(((xmid0, ymid0), (xmid1, ymid1), (xmid2, ymid2)))
 
 
-def _normalize(v: np.ndarray) -> np.ndarray:
+def _normalize(v: npt.NDArray[float]) -> npt.NDArray[float]:
     """
     Normalizes a vector to a unit vector.
 
     Parameters
     ----------
-    v : np.ndarray
+    v : ndarray
         The input vector to normalize.
 
     Returns
     -------
-    np.ndarray
-        The normalized unit vector. Returns a vector of NaNs if the norm is
-        not finite.
+    ndarray
+        The normalized unit vector. Returns a vector of NaNs if the norm is not
+        finite.
     """
     norm = np.linalg.norm(v)
     if not np.isfinite(norm):
@@ -274,14 +269,13 @@ def _normalize(v: np.ndarray) -> np.ndarray:
 
 
 def refine(
-        func: Callable[[np.ndarray], np.ndarray] |
-              Callable[[np.ndarray, np.ndarray], np.ndarray],
-        sample: Sample2d | Sample3d,
-        contour_levels: np.ndarray | None,
+        func: Function[float],
+        sample: Sample,
+        contour_levels: npt.NDArray[float] | None,
         contour_only: bool,
         theta: float,
         n_iters: int
-) -> Sample2d | Sample3d:
+) -> Sample:
     """
     Adaptively refines a sample mesh by adding points in areas of interest.
 
@@ -298,11 +292,11 @@ def refine(
 
     Parameters
     ----------
-    func : Callable
+    func : Function of float
         The univariate or bivariate function that is being sampled.
-    sample : Sample2d or Sample3d
+    sample : Sample
         An object containing the initial sample points.
-    contour_levels : np.ndarray or None
+    contour_levels : ndarray or None
         Contour levels to refine around.
     contour_only : bool
         If True, refinement is based only on contour line intersections. If
@@ -315,7 +309,7 @@ def refine(
 
     Returns
     -------
-    Sample2d or Sample3d
+    Sample
         A new sample object containing both the original and the new refined
         points.
         
@@ -358,9 +352,9 @@ def refine(
 
 
 def _refine_univariate(
-        func: Callable[[np.ndarray], np.ndarray],
-        data: np.ndarray,
-        contour_levels: np.ndarray | None,
+        func: Univariate[float],
+        data: npt.NDArray[float],
+        contour_levels: npt.NDArray[float] | None,
         contour_only: bool,
         theta: float,
         n_iters: int
@@ -370,11 +364,11 @@ def _refine_univariate(
 
     Parameters
     ----------
-    func : Callable
+    func : Univariate of float
         The univariate function being sampled.
-    data : np.ndarray
+    data : ndarray of shape (n_samples, 2)
         The array of (x, y) sample points.
-    contour_levels : np.ndarray or None
+    contour_levels : ndarray of shape (n_levels,) or None
         Contour levels to refine around.
     contour_only : bool
         Whether to refine based only on contours.
@@ -403,9 +397,9 @@ def _refine_univariate(
 
 
 def _refine_bivariate(
-        func: Callable[[np.ndarray, np.ndarray], np.ndarray],
-        data: np.ndarray,
-        contour_levels: np.ndarray | None,
+        func: Bivariate[float],
+        data: npt.NDArray[float],
+        contour_levels: npt.NDArray[float] | None,
         contour_only: bool,
         theta: float,
         n_iters: int
@@ -415,11 +409,11 @@ def _refine_bivariate(
 
     Parameters
     ----------
-    func : Callable
+    func : Bivariate of float
         The bivariate function being sampled.
-    data : np.ndarray
+    data : ndarray of shape (n_samples, 3)
         The array of (x, y, z) sample points.
-    contour_levels : np.ndarray or None
+    contour_levels : ndarray of (n_levels,) or None
         Contour levels to refine around.
     contour_only : bool
         Whether to refine based only on contours.
@@ -451,13 +445,13 @@ def _refine_bivariate(
     return Sample3d(*data.T, None)
 
 
-def _compute_total_length(data: np.ndarray) -> float:
+def _compute_total_length(data: npt.NDArray[float]) -> float:
     """
     Computes the total sampling interval length.
 
     Parameters
     ----------
-    data : np.ndarray of shape (n_samples, 2)
+    data : ndarray of shape (n_samples, 2)
         A 2D array containing pairs of (x, y) sampled points, where x 
         coordinates are assumed to be sorted in ascending order.
 
@@ -469,13 +463,13 @@ def _compute_total_length(data: np.ndarray) -> float:
     return data[-1, 0] - data[0, 0]
 
 
-def _compute_total_area(data: np.ndarray) -> float:
+def _compute_total_area(data: npt.NDArray[float]) -> float:
     """
     Computes the total area of the sampling region.
 
     Parameters
     ----------
-    data : numpy.ndarray of shape (n_samples, 3)
+    data : ndarray of shape (n_samples, 3)
         A 2D array containing triples of (x, y, z) sampled points. The x and y
         coordinates are expected to be raveled from a ``np.meshgrid()``.
 
@@ -488,24 +482,23 @@ def _compute_total_area(data: np.ndarray) -> float:
 
 
 def _build_intervals(
-        data: np.ndarray,
+        data: npt.NDArray[float],
         compute_normal: bool,
-        mask: np.ndarray | None = None
 ) -> list[_Interval]:
     """
     Constructs a list of Interval objects from 1D point data.
 
     Parameters
     ----------
-    data : np.ndarray
+    data : ndarray of shape (n_samples, 2)
         The sorted 2D array of (x, y) sample points.
     compute_normal : bool
         If True, computes the normal vector for each interval.
 
     Returns
     -------
-    list[Interval]
-        A list of connected Interval objects.
+    list of _Intervals
+        A list of connected ``_Interval`` objects.
     """
     data = data[np.argsort(data[:, 0])]
     intervals = []
@@ -521,11 +514,10 @@ def _build_intervals(
 
 
 def _build_triangles(
-        data: np.ndarray,
+        data: npt.NDArray[float],
         compute_normal: bool,
         delaunay: Delaunay | None,
         n_new_samples: int,
-        mask: np.ndarray | None = None
 ) -> tuple[list[_Triangle], Delaunay]:
     """
     Constructs a list of Triangle objects using Delaunay triangulation.
@@ -536,7 +528,6 @@ def _build_triangles(
     algorithm works by lifting the 2D points onto a 3D paraboloid, computing
     their convex hull, and projecting the lower hull faces back onto the 2D
     plane to obtain the Delaunay triangulation. For details, see:
-
     - Delaunay triangulation : https://en.wikipedia.org/wiki/Delaunay_triangulation
     - Triangulation theory : https://i.cs.hku.hk/~provinci/training11/delaunay.pdf
     - Bowyer-Watson : https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
@@ -545,7 +536,7 @@ def _build_triangles(
 
     Parameters
     ----------
-    data : np.ndarray
+    data : ndarray of shape (n_samples, 3)
         The 3D array of (x, y, z) sample points.
     compute_normal : bool
         If True, computes the normal vector for each triangle.
@@ -557,11 +548,11 @@ def _build_triangles(
 
     Returns
     -------
-    list[Triangle]
-        A list of connected Triangle objects forming the Delaunay triangulation.
+    list of _Triangles
+        A list of connected ``_Triangle`` objects forming the Delaunay
+        triangulation.
     Delaunay
-        The updated or newly created Delaunay triangulation object used for
-        incremental updates.
+        The updated or newly created ``scipy.spatial.Delaunay`` object.
     """
     if delaunay is None:
         delaunay = Delaunay(data[:, :-1], incremental=True)
@@ -583,15 +574,14 @@ def _build_triangles(
 
 
 def _compute_badness(
-        meshes: list[_Interval] | list[_Triangle],
-        contour_levels: np.ndarray or None,
+        meshes: list[_MeshElement],
+        contour_levels: npt.NDArray[float] | None,
         contour_only: bool
 ) -> None:
     """
     Calculates and assigns a 'badness' metric to each mesh element.
 
     The badness is determined by two criteria:
-    
     1. Curvature : The curvature between two adjacent mesh elements.
     2. Contour Intersection : A badness of inf is assigned if any contour level
         passes through the element. This ensures that mesh elements intersecting
@@ -599,9 +589,9 @@ def _compute_badness(
 
     Parameters
     ----------
-    meshes : list[Interval] or list[Triangle]
+    meshes : list of _MeshElements
         The list of mesh elements to evaluate.
-    contour_levels : np.ndarray or None
+    contour_levels : ndarray of shape (n_levels,) or None
         Contour levels to refine around.
     contour_only : bool
         If True, only the contour intersection criterion is used.
@@ -627,8 +617,8 @@ def _compute_badness(
 
 
 def _compute_curvature(
-        mesh: _Interval | _Triangle,
-        neighbor: _Interval | _Triangle
+        mesh: _MeshElement,
+        neighbor: _MeshElement
 ) -> float:
     """
     Computes the curvature between two adjacent mesh elements.
@@ -636,15 +626,14 @@ def _compute_curvature(
     The curvature is approximated by measuring the change in normal vectors
     between adjacent mesh elements rather than computing the exact geometric
     curvature. For more details, see:
-
     - Curvature : https://en.wikipedia.org/wiki/Curvature
     - Relation b/w curvature and normal vector : https://math.libretexts.org/Bookshelves/Calculus/Supplemental_Modules_%28Calculus%29/Vector_Calculus/2%3A_Vector-Valued_Functions_and_Motion_in_Space/2.3%3A_Curvature_and_Normal_Vectors_of_a_Curve
 
     Parameters
     ----------
-    mesh : Interval or Triangle
+    mesh : _MeshElement
         The first mesh element.
-    neighbor : Interval or Triangle
+    neighbor : _MeshElement
         The adjacent mesh element.
 
     Returns
@@ -658,14 +647,13 @@ def _compute_curvature(
 
 
 def _refine_mesh(
-        func: Callable[[np.ndarray], np.ndarray] |
-              Callable[[np.ndarray, np.ndarray], np.ndarray],
-        data: np.ndarray,
-        meshes: list[_Interval] | list[_Triangle],
+        func: Function[float],
+        data: npt.NDArray[float],
+        meshes: list[_MeshElement],
         theta: float,
         total_area: float,
         eps: float
-) -> tuple[np.ndarray, int]:
+) -> tuple[npt.NDArray[float], int]:
     """
     Refines the mesh by adding new sample points.
 
@@ -682,18 +670,18 @@ def _refine_mesh(
 
     Parameters
     ----------
-    func : Callable
+    func : Function of float
         The function to sample for the new points.
-    data : np.ndarray
+    data : ndarray of shape (n_samples, dim)
         The current array of sample points.
-    meshes : list[Interval] or list[Triangle]
+    meshes : list of _MeshElements
         The list of mesh elements.
     theta : float
         The badness threshold.
 
     Returns
     -------
-    np.ndarray
+    ndarray of shape (n_refined_samples, dim)
         The updated data array with new points.
     int
         The number of new samples added.

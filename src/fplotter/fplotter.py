@@ -1,10 +1,15 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from importlib.resources import files
 
 import numpy as np
+import numpy.typing as npt
 
 from plotter import Plotter
-from . import clipper, refiner, resampler, sampler
+from .clipper import clip
+from .refiner import refine
+from .resampler import resample
+from .sampler import Sample, Sample2d, Sample3d, sample_uniform
+from .types import Univariate, Bivariate, Function
 
 
 class FPlotter(Plotter):
@@ -20,7 +25,7 @@ class FPlotter(Plotter):
 
     Parameters
     ----------
-    figure_size : tuple[float, float], optional (default: (4.6, 3.45))
+    figure_size : (float, float), optional (default: (4.6, 3.45))
         The width and height of the figure in inches.
     dpi : int, optional (default: 300)
         The resolution of the figure in dots per inch.
@@ -42,9 +47,9 @@ class FPlotter(Plotter):
 
     """ Public Methods """
 
-    def fline(
+    def flines(
             self,
-            func: Callable[[np.ndarray], np.ndarray],
+            funcs: Iterable[Univariate[float]] | Univariate[float],
             xbound: tuple[float, float],
             n_samples: int = 100,
             ybound: tuple[float, float] | None = None,
@@ -52,10 +57,11 @@ class FPlotter(Plotter):
             k: float = 1.5,
             n_iters: int = 3,
             theta: float = 0.1745,
+            legends: Iterable[str] | None = None,
             **kwargs
-    ) -> None:
+    ):
         """
-        Plots a 2D line graph of a univariate function ``y = f(x)``.
+        Plots a 2D line graph of univariate functions y = f(x).
 
         The function is evaluated using an adaptive sampling algorithm that
         adds more points in regions of high curvature. The y-axis data can be
@@ -64,18 +70,22 @@ class FPlotter(Plotter):
 
         Parameters
         ----------
-        func : Callable[[np.ndarray], np.ndarray]
-            The univariate function to plot. Must be vectorized to handle
-            np.array inputs.
-        xbound : tuple[float, float]
+        funcs : Univariate of float or Iterable of such
+            The univariate function(s) to plot. Must be vectorized to handle
+            ndarray inputs. When plotting multiple functions, it is recommended
+            to pass them together through this parameter rather than making
+            multiple calls to ``flines()``, as auto-clipping considers the
+            combined y-range of all functions.
+        xbound : (float, float)
             The (min, max) range of the x-axis to be plotted. The first element
             must be smaller than the second element.
         n_samples : int, optional (default: 100)
             The number of initial samples.
-        ybound : tuple[float, float] or None, optional (default: None)
+        ybound : (float, float) or None, optional (default: None)
             The (min, max) clipping range for the y-axis. If provided, the first
-            element must be smaller than the second element. If None, the range
-            is calculated automatically if ``auto_clip`` is True.
+            element must be smaller than the second element. Note that when
+            ``ybound`` is provided, auto-clipping will not be performed even if
+            ``auto_clip`` is True.
         auto_clip : bool, optional (default: True)
             If True, automatically determines the y-axis clipping range based
             on the interquartile range (IQR) of the data.
@@ -89,55 +99,26 @@ class FPlotter(Plotter):
         theta : float, optional (default: 0.1745 which is approx. 10 degrees)
             The curvature threshold in radians for refinement. Smaller values
             lead to more refinement.
+        legends : Iterable of str or None, optional (default: None)
+            The labels for the functions in the legend.
         **kwargs
             Additional graphical arguments are passed to ``Plotter.line()`.
         """
-        sample, ybound = self._process_samples(
-            func, n_samples, np.atleast_2d(xbound), ybound, auto_clip, k,
+        funcs = list(funcs) if isinstance(funcs, Iterable) else [funcs]
+        legends = legends if legends is not None else [None] * len(funcs)
+        samples, ybound = self._process_samples(
+            funcs, n_samples, np.atleast_2d(xbound), ybound, auto_clip, k,
             n_iters, theta, False
         )
-        super().line(*sample.reshape_as_grid(True), **kwargs)
+        for sample, legend in zip(samples, legends):
+            super().line(*sample.reshape_as_grid(True), legend=legend, **kwargs)
         if ybound is not None:
             super().axis_limit(ylimit=ybound)
-
-    # TODO: documentation
-    def flines(
-            self,
-            funcs: list[Callable[[np.ndarray], np.ndarray]],
-            xbound: tuple[float, float],
-            n_samples: int = 100,
-            ybound: tuple[float, float] | None = None,
-            auto_clip: bool = True,
-            k: float = 1.5,
-            n_iters: int = 3,
-            theta: float = 0.1745,
-            **kwargs
-    ):
-        samples = []
-        for func in funcs:
-            samples.append(sampler.sample(func, n_samples, xbound))
-        if auto_clip or ybound is not None:
-            data_merged = np.vstack([sample.data.data for sample in samples])
-            sample_merged = sampler.Sample2d(*data_merged.T, None)
-            _, ybound = clipper.clip(sample_merged, ybound, k)
-        if n_iters > 0:
-            contour_levels = None if ybound is None \
-                else np.array(ybound)
-            for i, func in enumerate(funcs):
-                sample = refiner.refine(
-                    func, samples[i], contour_levels, False, theta, n_iters
-                )
-                samples[i] = resampler.resample(sample)
-        for sample in samples:
-            mask, _ = clipper.clip(sample, ybound, k)
-            sample.set_mask(mask)
-            super().line(*sample.reshape_as_grid(True), **kwargs)
-        if ybound is not None:
-            super().axis_limit(ylimit=ybound)
+        self._recover_xaxis_limit(xbound)
 
     def fcontour(
             self,
-            func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+            func: Bivariate[float],
             xbound: tuple[float, float],
             ybound: tuple[float, float],
             n_samples: tuple[int, int] = (50, 50),
@@ -150,7 +131,7 @@ class FPlotter(Plotter):
             **kwargs
     ) -> None:
         """
-        Plots a contour graph of a bivariate function ``z = f(x, y)``.
+        Plots a contour graph of a bivariate function z = f(x, y).
 
         The function is evaluated on an adaptive grid that is refined in areas
         of high curvature. The z-axis data can be clipped to a "focus zone" to
@@ -158,21 +139,22 @@ class FPlotter(Plotter):
 
         Parameters
         ----------
-        func : Callable[[np.ndarray, np.ndarray], np.ndarray]
+        func : Bivariate of float
             The bivariate function to plot. Must be vectorized to handle
-            np.array inputs.
-        xbound : tuple[float, float]
+            ndarray inputs.
+        xbound : (float, float)
             The (min, max) range of the x-axis. The first element must be
             smaller than the second element.
-        ybound : tuple[float, float]
+        ybound : (float, float)
             The (min, max) range of the y-axis. The first element must be
             smaller than the second element.
-        n_samples : tuple[int, int], optional (default: (25, 25))
+        n_samples : (int, int), optional (default: (25, 25))
             The initial grid size (nx, ny).
-        zbound : tuple[float, float] or None, optional (default: None)
+        zbound : (float, float) or None, optional (default: None)
             The (min, max) clipping range for the z-axis. If provided, the first
-            element must be smaller than the second element. If None, the range
-            is calculated automatically if ``auto_clip`` is True.
+            element must be smaller than the second element. Note that when 
+            ``zbound`` is provided, auto-clipping will not be performed even if 
+            ``auto_clip`` is True.
         auto_clip : bool, optional (default: True)
             If True, automatically determines the z-axis clipping range.
         k : float, optional (default: 3)
@@ -194,10 +176,11 @@ class FPlotter(Plotter):
         intersections. This makes it more computationally efficient but
         potentially less accurate in regions between contours.
         """
-        sample, zbound = self._process_samples(
-            func, n_samples, np.array((xbound, ybound)), zbound, auto_clip, k,
+        samples, zbound = self._process_samples(
+            [func], n_samples, np.array((xbound, ybound)), zbound, auto_clip, k,
             n_iters, theta, True
         )
+        sample = samples[0]
         if clip_line and zbound is not None:
             self._draw_clip_shadow(sample, zbound)
         super().contour(*sample.reshape_as_grid(True), **kwargs)
@@ -206,7 +189,7 @@ class FPlotter(Plotter):
 
     def fheatmap(
             self,
-            func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+            func: Bivariate[float],
             xbound: tuple[float, float],
             ybound: tuple[float, float],
             n_samples: tuple[int, int] = (50, 50),
@@ -227,21 +210,22 @@ class FPlotter(Plotter):
 
         Parameters
         ----------
-        func : Callable[[np.ndarray, np.ndarray], np.ndarray]
+        func : Bivariate of float
             The bivariate function to plot. Must be vectorized to handle numpy
             array inputs.
-        xbound : tuple[float, float]
+        xbound : (float, float)
             The (min, max) range of the x-axis. The first element must be
             smaller than the second element.
-        ybound : tuple[float, float]
+        ybound : (float, float)
             The (min, max) range of the y-axis. The first element must be
             smaller than the second element.
-        n_samples : tuple[int, int], optional (default: (25, 25))
+        n_samples : (int, int), optional (default: (25, 25))
             The initial grid size (nx, ny).
-        zbound : tuple[float, float] or None, optional (default: None)
+        zbound : (float, float) or None, optional (default: None)
             The (min, max) clipping range for the z-axis. If provided, the first
-            element must be smaller than the second element. If None, the range
-            is calculated automatically if ``auto_clip`` is True.
+            element must be smaller than the second element. Note that when 
+            ``zbound`` is provided, auto-clipping will not be performed even if 
+            ``auto_clip`` is True.
         auto_clip : bool, optional (default: True)
             If True, automatically determines the z-axis clipping range.
         k : float, optional (default: 3)
@@ -257,10 +241,11 @@ class FPlotter(Plotter):
         **kwargs
             Additional graphical arguments are passed to ``Plotter.heatmap()``.
         """
-        sample, zbound = self._process_samples(
-            func, n_samples, np.array((xbound, ybound)), zbound, auto_clip, k,
+        samples, zbound = self._process_samples(
+            [func], n_samples, np.array((xbound, ybound)), zbound, auto_clip, k,
             n_iters, theta, False
         )
+        sample = samples[0]
         if clip_line and zbound is not None:
             self._draw_clip_shadow(sample, zbound)
         super().heatmap(*sample.reshape_as_grid(True), **kwargs)
@@ -271,40 +256,38 @@ class FPlotter(Plotter):
 
     @staticmethod
     def _process_samples(
-            func: Callable[[np.ndarray], np.ndarray] |
-                  Callable[[np.ndarray, np.ndarray], np.ndarray],
+            funcs: list[Function[float]],
             n_samples: int | tuple[int, int],
-            bounds: np.ndarray,
+            bounds: npt.NDArray[float],
             clip_bound: tuple[float, float] | None,
             auto_clip: bool,
             k: float,
             n_iters: int,
             theta: float,
             contour_only: bool
-    ) -> tuple[sampler.Sample2d | sampler.Sample3d, tuple[float, float] | None]:
+    ) -> tuple[list[Sample], tuple[float, float] | None]:
         """
         Processes function samples through a pipeline of sampling, clipping,
         refining, and resampling.
 
         The sample processing pipeline consists of four stages:
         1. Initial sampling : Extracts samples from a uniform rectangular mesh
-        2. Clipping : Determines appropriate clipping bounds from initial 
+        2. Clipping : Determines appropriate clipping bounds from initial
             function values if auto-clipping is enabled
         3. Adaptive refinement : Refines the mesh in areas of high curvature and
             near clipping boundaries, stopping when mesh becomes too fine
-        4. Resampling : Interpolates the refined irregular mesh back to a 
+        4. Resampling : Interpolates the refined irregular mesh back to a
             rectangular grid and applies the clipping mask
 
         Parameters
         ----------
-        func : Callable[[np.ndarray], np.ndarray] or
-               Callable[[np.ndarray, np.ndarray], np.ndarray]
+        funcs : list of Function of float
             The mathematical function to be sampled.
-        n_samples : int or tuple[int, int]
+        n_samples : int or (int, int)
             The number of initial samples to generate.
-        bounds : np.ndarray
+        bounds : ndarray
             The boundaries for the initial sampling domain.
-        clip_bound : tuple[float, float] or None
+        clip_bound : (float, float) or None
             A user-defined (lower, upper) boundary for clipping data.
         auto_clip : bool
             If True, calculates the clipping boundary automatically using the
@@ -318,12 +301,12 @@ class FPlotter(Plotter):
 
         Returns
         -------
-        sampler.Sample2d or sampler.Sampled3d
+        Sample
             The final, processed Sample object ready for plotting.
-        tuple[float, float] or None
+        (float, float) or None
             The (lower, upper) clipping boundary that was used. Returns None
             only if either auto_clip is False and no user-defined clip_bound is
-            provided, or if auto_clip is True but the automatically calculated 
+            provided, or if auto_clip is True but the automatically calculated
             clipping boundary is invalid.
 
         Notes
@@ -335,24 +318,46 @@ class FPlotter(Plotter):
         behavior, potentially leading to suboptimal visualization. This effect
         is particularly noticeable when using very small initial sample sizes.
         """
-        sample = sampler.sample(func, n_samples, *bounds)
-        mask = np.repeat(False, sample.n_samples)
+        samples = []
+        for func in funcs:
+            samples.append(sample_uniform(func, n_samples, *bounds))
         if auto_clip or clip_bound is not None:
-            mask, clip_bound = clipper.clip(sample, clip_bound, k)
+            # Merge all samples into a single array for clipping
+            merged_data = np.vstack([sample.data.data for sample in samples])
+            merged_sample = Sample(np.ma.MaskedArray(merged_data), None)
+            _, clip_bound = clip(merged_sample, clip_bound, k)
         if n_iters > 0:
             contour_levels = None if clip_bound is None \
                 else np.array(clip_bound)
-            sample = refiner.refine(
-                func, sample, contour_levels, contour_only, theta, n_iters
-            )
-            sample = resampler.resample(sample)
-            mask, _ = clipper.clip(sample, clip_bound, k)
-        sample.set_mask(mask)
-        return sample, clip_bound
+            for i, func in enumerate(funcs):
+                sample = refine(
+                    func, samples[i], contour_levels, contour_only, theta,
+                    n_iters
+                )
+                samples[i] = resample(sample)
+        if clip_bound is not None:
+            for sample in samples:
+                mask, _ = clip(sample, clip_bound, k)
+                sample.set_mask(mask)
+        return samples, clip_bound
+
+    def _recover_xaxis_limit(self, xbound: tuple[float, float]):
+        """
+        Adjusts and recovers the x-axis limits.
+
+        Parameters
+        ----------
+        xbound : (float, float)
+            A tuple containing the lower and upper bounds of the x-axis.
+        """
+        x0, x1 = xbound
+        xrange = x1 - x0
+        margin = self.axes.margins()[0]
+        super().axis_limit(xlimit=(x0 - margin * xrange, x1 + margin * xrange))
 
     def _draw_clip_shadow(
             self,
-            sample: sampler.Sample3d,
+            sample: Sample3d,
             zbound: tuple[float, float]
     ) -> None:
         """
@@ -360,9 +365,9 @@ class FPlotter(Plotter):
 
         Parameters
         ----------
-        sample : sampler.Sample3d
+        sample : Sample3d
             The sample data for the plot.
-        zbound : tuple[float, float]
+        zbound : (float, float)
             The (lower, upper) boundary of the focus zone.
         """
         self.axes.contourf(
@@ -372,7 +377,7 @@ class FPlotter(Plotter):
 
     def _draw_clip_line(
             self,
-            sample: sampler.Sample3d,
+            sample: Sample3d,
             zbound: tuple[float, float]
     ) -> None:
         """
@@ -380,9 +385,9 @@ class FPlotter(Plotter):
 
         Parameters
         ----------
-        sample : sampler.Sample3d
+        sample : Sample3d
             The sample data for the plot.
-        zbound : tuple[float, float]
+        zbound : (float, float)
             The (lower, upper) boundary of the focus zone.
         """
         super().contour(

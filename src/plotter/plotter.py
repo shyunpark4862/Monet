@@ -30,6 +30,8 @@ from typing import Literal
 
 import matplotlib.pyplot as plt
 
+from .types import Color, LineStyle
+
 
 def _apply_style(method):
     """
@@ -37,12 +39,12 @@ def _apply_style(method):
 
     Parameters
     ----------
-    method : callable
+    method : Callable
         The plotting method to be wrapped.
 
     Returns
     -------
-    callable
+    Callable
         The wrapper function that applies the style context.
     """
 
@@ -80,7 +82,7 @@ class Plotter:
     
     Parameters
     ----------
-    figure_size : tuple[float, float], optional (default: (4.6, 3.45))
+    figure_size : (float, float), optional (default: (4.6, 3.45))
         The width and height of the figure in inches.
     dpi : int, optional (default: 300)
         The resolution of the figure in dots per inch.
@@ -121,16 +123,14 @@ class Plotter:
             x: Iterable[float],
             y: Iterable[float],
             alpha: float = 1,
-            linecolor: str | tuple[float, float, float] | None = None,
+            linecolor: Color | None = None,
             linewidth: float = 1,
-            linestyle: Literal[
-                "solid", "dashed", "dashdot", "dotted"
-            ] = "solid",
+            linestyle: LineStyle = "solid",
             marker: str | None = None,
             markersize: float = 5,
-            markeredgecolor: str | tuple[float, float, float] | None = None,
+            markeredgecolor: Color | None = None,
             markeredgewidth: float = 0,
-            markerfacecolor: str | tuple[float, float, float] | None = None,
+            markerfacecolor: Color | None = None,
             zorder: int | None = None,
             legend: str | None = None
     ) -> None:
@@ -147,12 +147,11 @@ class Plotter:
             The transparency of all plot elements (line, marker face, marker 
             edge). Value ranges from 0 (completely transparent) to 1 (completely
             opaque). Cannot be set independently for different elements.
-        linecolor : str or tuple[float, float, float] or None, optional
-                    (default: None)
-            The color of the line. Can be a color name as string (e.g. "red") 
-            or RGB values as a tuple of floats between 0 and 1. Transparency 
-            should be set via the ``alpha`` parameter, not as a fourth tuple 
-            value.
+        linecolor : Color or None, optional (default: None)
+            The color of the line. Can be a color name as a string (e.g. "red"), 
+            RGB values as a tuple of floats between 0 and 1, or a hex RGB color 
+            code (e.g. "#FF0000"). Transparency should be set via the ``alpha`` 
+            parameter, not as a fourth tuple value.
         linewidth : float, optional (default: 1)
             The width of the line.
         linestyle : {"solid", "dashed", "dashdot", "dotted"}, optional
@@ -162,20 +161,18 @@ class Plotter:
             The marker style for the data points.
         markersize : float, optional (default: 5)
             The size of the markers.
-        markeredgecolor : str or tuple[float, float, float] or None, optional
-                          (default: None)
-            The color of the marker edges. Can be a color name as string 
-            (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
-            Transparency should be set via the ``alpha`` parameter, not as a  
-            fourth tuple value.
+        markeredgecolor : Color or None, optional (default: None)
+            The color of the marker edges. Can be a color name as a string  
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            the ``alpha`` parameter, not as a fourth tuple value.
         markeredgewidth : float, optional (default: 0)
             The width of the marker edges.
-        markerfacecolor : str or tuple[float, float, float] or None, optional
-                          (default: None)
-            The color of the marker face. Can be a color name as string 
-            (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
-            Transparency should be set via the ``alpha`` parameter, not as a 
-            fourth tuple value.
+        markerfacecolor : Color or None, optional (default: None)
+            The color of the marker face. Can be a color name as a string  
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            the ``alpha`` parameter, not as a fourth tuple value.
         zorder : int or None, optional (default: None)
             The z-order for plotting. Higher values appear in front of elements
             with lower values.
@@ -200,11 +197,9 @@ class Plotter:
             levels: int | Iterable[float] = 10,
             alpha: float = 1,
             color_map: str = "viridis",
-            linecolor: str | tuple[float, float, float] | None = None,
+            linecolor: Color | None = None,
             linewidth: float = 1,
-            linestyle: Literal[
-                "solid", "dashed", "dashdot", "dotted"
-            ] = "solid",
+            linestyle: LineStyle = "solid",
             colorbar: bool = True,
             label: bool = True
     ) -> None:
@@ -223,7 +218,6 @@ class Plotter:
         generate contour lines. The Marching Squares algorithm determines how
         contour lines intersect each cell of a rectangular grid by examining
         the values at the four corners. For more details, see:
-
         - ContourPy documentation: https://contourpy.readthedocs.io/en/v1.3.3/
         - Marching Squares: https://en.wikipedia.org/wiki/Marching_squares
         - Historical CONREC method (previously used by matplotlib):
@@ -247,12 +241,12 @@ class Plotter:
         color_map : str, optional (default: "viridis")
             The colormap for the contour lines. Ignored if ``linecolor`` is
             provided.
-        linecolor : str or tuple[float, float, float] or None, optional
-                    (default: None)
-            The color of the contour lines. Can be a color name as string 
-            (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
-            Transparency should be set via the ``alpha`` parameter, not as a 
-            fourth tuple value. When provided, overrides ``color_map``.
+        linecolor : Color or None, optional (default: None)
+            The color of the contour lines. Can be a color name as a string  
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            the ``alpha`` parameter, not as a fourth tuple value. When provided, 
+            overrides ``color_map``.
         linewidth : float, optional (default: 1)
             The width of the contour lines.
         linestyle : {"solid", "dashed", "dashdot", "dotted"}, optional
@@ -292,11 +286,9 @@ class Plotter:
             color_map: str = "viridis",
             contour: bool = True,
             levels: int | Iterable[float] | None = None,
-            linecolor: str | tuple[float, float, float] = "white",
+            linecolor: Color = "white",
             linewidth: float | None = 0.75,
-            linestyle: Literal[
-                "solid", "dashed", "dashdot", "dotted"
-            ] = "solid",
+            linestyle: LineStyle = "solid",
             colorbar: bool = True,
             label: bool = True
     ) -> None:
@@ -304,8 +296,8 @@ class Plotter:
         Creates a heatmap.
 
         This method uses ``plt.contourf()`` with many levels (100) instead of 
-        ``plt.imshow()`` since the input grid (``X``, ``Y``) is not assumed to 
-        be uniform. While this provides more flexibility in handling arbitrary 
+        ``plt.imshow()`` since the input grid (X, Y) is not assumed to be 
+        uniform. While this provides more flexibility in handling arbitrary 
         grids, it may have performance implications for large data.
 
         Parameters
@@ -324,12 +316,11 @@ class Plotter:
             Whether to overlay contour lines.
         levels : int or Iterable[float] or None, optional (default: None)
             The number of contour levels or specific levels.
-        linecolor : str or tuple[float, float, float], optional
-                    (default: "white")
+        linecolor : Color, optional (default: "white")
             The color of the contour lines. Can be a color name as string 
-            (e.g. "red") or RGB values as a tuple of floats between 0 and 1. 
-            Transparency should be set via the ``alpha`` parameter, not as a 
-            fourth tuple value.
+            (e.g. "red"), RGB values as a tuple of floats between 0 and 1, or a 
+            hex RGB color code (e.g. "#FF0000"). Transparency should be set via 
+            the ``alpha`` parameter, not as a fourth tuple value.
         linewidth : float, optional (default: 0.75)
             The width of the contour lines.
         linestyle : {"solid", "dashed", "dashdot", "dotted"}, optional
@@ -361,7 +352,8 @@ class Plotter:
 
     @_apply_style
     def show(self) -> None:
-        """Displays the current figure.
+        """
+        Displays the current figure.
         
         Note
         ----
@@ -534,9 +526,9 @@ class Plotter:
 
         Parameters
         ----------
-        xlimit : tuple[float, float] or None, optional (default: None)
+        xlimit : (float, float) or None, optional (default: None)
             The limits for the x-axis.
-        ylimit : tuple[float, float] or None, optional (default: None)
+        ylimit : (float, float) or None, optional (default: None)
             The limits for the y-axis.
         
         
@@ -559,8 +551,9 @@ class Plotter:
     @_apply_style
     def _init_figure(self) -> None:
         """Initializes the figure and axes objects."""
-        self.figure = plt.figure(figsize=self.figure_size, dpi=self.dpi,
-                                 layout="tight")
+        self.figure = plt.figure(
+            figsize=self.figure_size, dpi=self.dpi, layout="tight"
+        )
         self.axes = self.figure.subplots()
 
     """ Magic Methods """

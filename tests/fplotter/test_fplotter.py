@@ -6,7 +6,7 @@ from test_functions import bivariate_func
 
 def test_plotter_line(assert_figure):
     plotter = FPlotter()
-    plotter.fline(sp.gamma, (-3, 3))
+    plotter.flines(sp.gamma, (-3, 3))
     plotter.title("Function Line Plot")
     plotter.axis_label("$x$", "$y$")
     assert_figure(plotter.figure)

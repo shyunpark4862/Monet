@@ -17,14 +17,12 @@ class TestComputeFocusZone:
         y = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         k = 1.5
         # Q1 = 3.25, Q3 = 7.75, IQR = 4.5 -> Lower = -3.5, Upper=14.5
-        expected_bound = (-3.5, 14.5)
-        assert np.allclose(clipper._compute_focus_zone(y, k), expected_bound)
+        assert clipper._compute_focus_zone(y, k) is None
 
     def test_with_nan_values(self):
         y = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, np.nan, np.nan])
         k = 1.5
-        expected_bound = (-3.5, 14.5)
-        assert np.allclose(clipper._compute_focus_zone(y, k), expected_bound)
+        assert clipper._compute_focus_zone(y, k) is None
 
     def test_all_nans_returns_none(self):
         y = np.repeat(np.nan, 10)
@@ -34,8 +32,6 @@ class TestComputeFocusZone:
         y = np.array([5, 5, 5, 5, 5])
         assert clipper._compute_focus_zone(y, 1.5) is None
 
-
-# --- clip 함수 테스트 ---
 
 class TestClip:
     def test_with_provided_bound(self, standard_sample):

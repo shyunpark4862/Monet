@@ -25,15 +25,16 @@ SOFTWARE.
 from typing import Literal
 
 import numpy as np
+import numpy.typing as npt
 from scipy.interpolate import griddata
 
-from .sampler import Sample2d, Sample3d
+from .sampler import Sample2d, Sample3d, Sample
 
 
 def resample(
-        sample: Sample2d | Sample3d,
+        sample: Sample,
         method: Literal["linear", "cubic", "nearest"] = "linear",
-) -> Sample2d | Sample3d:
+) -> Sample:
     """
     Resamples univariate (2D) or bivariate (3D) sample data to a rectangular
     grid.
@@ -49,7 +50,7 @@ def resample(
 
     Parameters
     ----------
-    sample : Sample2d or Sample3d
+    sample : Sample
         The input sample object to be resampled.
     method : {"linear", "cubic", "nearest"}, optional (default: "linear")
         The interpolation method to use for resampling. This parameter is only
@@ -60,7 +61,7 @@ def resample(
 
     Returns
     -------
-    Sample2d or =Sample3d
+    Sample
         A new Sample object containing the resampled data.
 
     Raises
@@ -83,7 +84,7 @@ def resample(
 
 
 def _resample_univariate(
-        data: np.ndarray,
+        data: npt.NDArray[float],
         eps: float
 ) -> Sample2d:
     """
@@ -97,14 +98,14 @@ def _resample_univariate(
 
     Parameters
     ----------
-    data : np.ndarray of shape (n_samples, 2)
-        A np.ndarray representing the (x, y) data points.
+    data : ndarray of shape (n_samples, 2)
+        A ndarray representing the (x, y) data points.
     eps : float
         A small float value used to determine unique x and y coordinates.
 
     Returns
     -------
-    sampler.Sample2d
+    Sample2d
         A new ``Sample2d`` object containing the thinned data.
     """
     data = data[data[:, 0].argsort()]
@@ -119,7 +120,7 @@ def _resample_univariate(
 
 
 def _resample_bivariate(
-        data: np.ndarray,
+        data: npt.NDArray[float],
         method: Literal["linear", "cubic", "nearest"],
         eps: float
 ) -> Sample3d:
@@ -128,7 +129,6 @@ def _resample_bivariate(
 
     The function internally uses ``scipy.interpolate.griddata()`` for
     interpolation. Available interpolation methods are:
-
     - nearest : Interpolates using values from nearest points
     - linear : First performs Delaunay triangulation using Qhull on x, y
         coordinates, then applies barycentric interpolation within each triangle
@@ -137,7 +137,6 @@ def _resample_bivariate(
         Bezier polynomial on each triangle
 
     For more details on the Clough-Tocher scheme, see:
-
     - ``griddata`` documentation: https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CloughTocher2DInterpolator.html
     - Related paper : Alfeld, Peter. "A trivariate clough—tocher scheme for
         tetrahedral data." Computer Aided Geometric Design 1.2 (1984): 169-181.
@@ -150,8 +149,8 @@ def _resample_bivariate(
 
     Parameters
     ----------
-    data : np.ndarray of shape (n_samples, 3)
-        A np.ndarray representing the (x, y, z) data points.
+    data : ndarray of shape (n_samples, 3)
+        A ndarray representing the (x, y, z) data points.
     method : {"linear", "cubic", "nearest"}
         The interpolation method passed to ``scipy.interpolate.griddata``.
     eps : float
@@ -159,7 +158,7 @@ def _resample_bivariate(
 
     Returns
     -------
-    sampler.Sample3d
+    Sample3d
         A new ``Sample3d`` object containing the data interpolated on a regular
         grid.
     """
@@ -172,13 +171,16 @@ def _resample_bivariate(
     return Sample3d(x, y, z, grid_shape)
 
 
-def _sort(arr: np.ndarray, eps: float) -> np.ndarray:
+def _sort(
+        arr: npt.NDArray[float],
+        eps: float
+) -> npt.NDArray[float]:
     """
     Sorts a 1D array and removes duplicate or closely spaced values.
 
     Parameters
     ----------
-    arr : np.ndarray of shape (n,)
+    arr : ndarray of shape (n,)
         The 1D array to be sorted and thinned.
     eps : float
         A small float value used to calculate the tolerance for removing close
@@ -186,7 +188,7 @@ def _sort(arr: np.ndarray, eps: float) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    ndarray of shape (n,)
         A sorted 1D array with closely spaced values removed.
     """
     arr = np.sort(arr)

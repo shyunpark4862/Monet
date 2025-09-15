@@ -105,7 +105,7 @@ class TestSampleUniform:
     def test_univariate_sampling(self):
         n_samples = 11
         xbound = (0, 10)
-        result = sampler.sample(univariate_func, n_samples, xbound)
+        result = sampler.sample_uniform(univariate_func, n_samples, xbound)
         assert isinstance(result, sampler.Sample2d)
         assert result.n_samples == n_samples
         assert result.dim == 2
@@ -119,7 +119,7 @@ class TestSampleUniform:
     def test_bivariate_sampling(self):
         n_samples = (5, 6)
         xbound, ybound = (0, 4), (0, 5)
-        result = sampler.sample(bivariate_func, n_samples, xbound, ybound)
+        result = sampler.sample_uniform(bivariate_func, n_samples, xbound, ybound)
         assert isinstance(result, sampler.Sample3d)
         assert result.n_samples == n_samples[0] * n_samples[1]
         assert result.dim == 3
